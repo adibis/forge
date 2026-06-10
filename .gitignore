@@ -1,0 +1,22 @@
+# Zig build artifacts
+.zig-cache/
+zig-out/
+zig-cache/
+
+# Environment / secrets
+.env
+.env.*
+*.env
+**/.env
+**/*.env
+
+# macOS
+.DS_Store
+**/.DS_Store
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
