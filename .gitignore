@@ -14,6 +14,9 @@ zig-cache/
 .DS_Store
 **/.DS_Store
 
+# Local notes (not for repo)
+local/
+
 # Editor
 .vscode/
 .idea/
