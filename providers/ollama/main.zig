@@ -30,13 +30,22 @@ pub fn main(init: std.process.Init) !void {
     const prompt_val = parsed.value.object.get("prompt") orelse { writeError(gpa, io, "missing 'prompt'"); std.process.exit(1); };
     if (prompt_val != .string) { writeError(gpa, io, "'prompt' must be string"); std.process.exit(1); }
 
+    const schema_json = if (parsed.value.object.get("schema_json")) |v|
+        if (v == .string) v.string else ""
+    else "";
+
+    const full_prompt = try std.fmt.allocPrint(a,
+        "You are a JSON API. Return ONLY valid JSON — no explanation, no markdown.\n\nSchema:\n{s}\n\n{s}",
+        .{ schema_json, prompt_val.string },
+    );
+
     const host = env.get("OLLAMA_HOST") orelse DEFAULT_HOST;
     const model = env.get("OLLAMA_MODEL") orelse { writeError(gpa, io, "OLLAMA_MODEL not set"); std.process.exit(1); };
 
     const api_url = try std.fmt.allocPrint(a, "{s}/api/generate", .{host});
     const body_json = try std.fmt.allocPrint(a,
         \\{{"model":"{s}","prompt":"{s}","stream":false}}
-    , .{ model, try jsonEscape(a, prompt_val.string) });
+    , .{ model, try jsonEscape(a, full_prompt) });
 
     const argv = [_][]const u8{
         "curl", "-s", "-X", "POST", api_url,

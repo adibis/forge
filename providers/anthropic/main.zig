@@ -33,7 +33,14 @@ pub fn main(init: std.process.Init) !void {
 
     const prompt_val = parsed.value.object.get("prompt") orelse { writeError(gpa, io, "missing 'prompt'"); std.process.exit(1); };
     if (prompt_val != .string) { writeError(gpa, io, "'prompt' must be a string"); std.process.exit(1); }
-    const prompt = prompt_val.string;
+    const schema_json = if (parsed.value.object.get("schema_json")) |v|
+        if (v == .string) v.string else ""
+    else "";
+
+    const full_prompt = try std.fmt.allocPrint(a,
+        "You are a JSON API. Return ONLY valid JSON — no explanation, no markdown.\n\nSchema:\n{s}\n\n{s}",
+        .{ schema_json, prompt_val.string },
+    );
 
     const api_key = env.get("ANTHROPIC_API_KEY") orelse {
         writeError(gpa, io, "ANTHROPIC_API_KEY not set"); std.process.exit(1);
@@ -42,7 +49,7 @@ pub fn main(init: std.process.Init) !void {
 
     const body_json = try std.fmt.allocPrint(a,
         \\{{"model":"{s}","max_tokens":4096,"messages":[{{"role":"user","content":"{s}"}}]}}
-    , .{ model, try jsonEscape(a, prompt) });
+    , .{ model, try jsonEscape(a, full_prompt) });
 
     const auth_header = try std.fmt.allocPrint(a, "x-api-key: {s}", .{api_key});
 
