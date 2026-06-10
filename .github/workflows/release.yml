@@ -11,24 +11,34 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
+            zig_host: linux-x86_64
             target: x86_64-linux-musl
             asset: forge-linux-x86_64
           - os: ubuntu-latest
+            zig_host: linux-x86_64
             target: aarch64-linux-musl
             asset: forge-linux-aarch64
           - os: macos-latest
+            zig_host: macos-aarch64
             target: aarch64-macos
             asset: forge-darwin-arm64
           - os: macos-latest
+            zig_host: macos-aarch64
             target: x86_64-macos
             asset: forge-darwin-x86_64
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-      - uses: mlugg/setup-zig@v1
-        with:
-          version: '0.16.0'
-      - run: zig build -Doptimize=ReleaseFast -Dtarget=${{ matrix.target }}
+
+      - name: Install Zig 0.16.0
+        shell: bash
+        run: |
+          curl -fsSL "https://ziglang.org/download/0.16.0/zig-${{ matrix.zig_host }}-0.16.0.tar.xz" | tar -xJ
+          echo "$PWD/zig-${{ matrix.zig_host }}-0.16.0" >> "$GITHUB_PATH"
+
+      - name: Build
+        run: zig build -Doptimize=ReleaseFast -Dtarget=${{ matrix.target }}
+
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.asset }}
@@ -44,7 +54,8 @@ jobs:
         with:
           path: artifacts
           merge-multiple: false
-      - name: Rename artifacts to include platform in filename
+
+      - name: Rename artifacts
         run: |
           for dir in artifacts/*/; do
             name=$(basename "$dir")
@@ -52,6 +63,7 @@ jobs:
             rmdir "$dir"
           done
           ls -lh artifacts/
+
       - uses: softprops/action-gh-release@v2
         with:
           files: artifacts/forge-*
