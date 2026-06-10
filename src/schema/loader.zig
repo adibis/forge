@@ -141,7 +141,58 @@ pub fn loadSchema(root: *ir.SchemaRoot, val: std.json.Value) LoadError!ir.Schema
         schema.items = child;
     }
 
+    if (obj.get("minLength")) |v| {
+        if (jsonToUsize(v)) |n| schema.min_length = n;
+    }
+    if (obj.get("maxLength")) |v| {
+        if (jsonToUsize(v)) |n| schema.max_length = n;
+    }
+    if (obj.get("pattern")) |v| {
+        if (v == .string) schema.pattern = try arena.dupe(u8, v.string);
+    }
+
+    if (obj.get("allOf")) |v| schema.all_of = try loadSchemaArray(root, v);
+    if (obj.get("anyOf")) |v| schema.any_of = try loadSchemaArray(root, v);
+    if (obj.get("oneOf")) |v| schema.one_of = try loadSchemaArray(root, v);
+
+    if (obj.get("not")) |v| {
+        const child = try arena.create(ir.Schema);
+        child.* = try loadSchema(root, v);
+        schema.not = child;
+    }
+
+    if (obj.get("additionalProperties")) |v| {
+        switch (v) {
+            .bool => |b| { if (!b) schema.additional_properties_forbidden = true; },
+            .object => {
+                const child = try arena.create(ir.Schema);
+                child.* = try loadSchema(root, v);
+                schema.additional_properties_schema = child;
+            },
+            else => {},
+        }
+    }
+
     return schema;
+}
+
+fn loadSchemaArray(root: *ir.SchemaRoot, val: std.json.Value) LoadError![]const *ir.Schema {
+    const arena = root.allocator();
+    if (val != .array) return &.{};
+    var list: std.ArrayList(*ir.Schema) = .empty;
+    for (val.array.items) |item| {
+        const child = try arena.create(ir.Schema);
+        child.* = try loadSchema(root, item);
+        try list.append(arena, child);
+    }
+    return list.toOwnedSlice(arena);
+}
+
+fn jsonToUsize(v: std.json.Value) ?usize {
+    return switch (v) {
+        .integer => |i| if (i >= 0) @intCast(i) else null,
+        else => null,
+    };
 }
 
 fn jsonToF64(v: std.json.Value) ?f64 {

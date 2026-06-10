@@ -371,6 +371,150 @@ test "zig: string enum generates enum type" {
     try std.testing.expect(std.mem.containsAtLeast(u8, out, 1, "red,"));
 }
 
+// ---- new schema keywords: allOf, anyOf, oneOf, not, minLength, maxLength, additionalProperties ----
+
+fn parseAndValidateKeywords(a: std.mem.Allocator, schema_json: []const u8, input: []const u8, coerce: bool) !engine_mod.ValidationResult {
+    var root = try loader.loadFromSlice(a, schema_json);
+    var eng = engine_mod.Engine.init(a, &root);
+    var pr = try json_parse.parseLenient(a, input);
+    defer pr.deinit();
+    return eng.validate(pr.value, coerce);
+}
+
+test "minLength: rejects short string" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    var vr = try parseAndValidateKeywords(arena.allocator(),
+        \\{"type":"string","minLength":3}
+    , "\"ab\"", false);
+    defer vr.deinit();
+    try std.testing.expect(!vr.valid);
+    try std.testing.expectEqual(@as(usize, 1), vr.errors.items.len);
+}
+
+test "minLength: accepts string at boundary" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    var vr = try parseAndValidateKeywords(arena.allocator(),
+        \\{"type":"string","minLength":3}
+    , "\"abc\"", false);
+    defer vr.deinit();
+    try std.testing.expect(vr.valid);
+}
+
+test "maxLength: rejects long string" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    var vr = try parseAndValidateKeywords(arena.allocator(),
+        \\{"type":"string","maxLength":3}
+    , "\"toolong\"", false);
+    defer vr.deinit();
+    try std.testing.expect(!vr.valid);
+}
+
+test "additionalProperties: false rejects extra fields" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    var vr = try parseAndValidateKeywords(arena.allocator(),
+        \\{"type":"object","properties":{"name":{"type":"string"}},"additionalProperties":false}
+    , "{\"name\":\"Alice\",\"extra\":\"oops\"}", false);
+    defer vr.deinit();
+    try std.testing.expect(!vr.valid);
+    try std.testing.expectEqual(@as(usize, 1), vr.errors.items.len);
+}
+
+test "additionalProperties: false strips extra fields in coerce mode" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    var vr = try parseAndValidateKeywords(arena.allocator(),
+        \\{"type":"object","properties":{"name":{"type":"string"}},"additionalProperties":false}
+    , "{\"name\":\"Alice\",\"extra\":\"oops\"}", true);
+    defer vr.deinit();
+    try std.testing.expect(vr.best_effort != null);
+    try std.testing.expect(vr.best_effort.?.object.get("extra") == null);
+    try std.testing.expect(vr.best_effort.?.object.get("name") != null);
+}
+
+test "allOf: valid when all subschemas pass" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    var vr = try parseAndValidateKeywords(arena.allocator(),
+        \\{"allOf":[{"type":"object","properties":{"x":{"type":"integer"}}},{"type":"object","required":["x"]}]}
+    , "{\"x\":1}", false);
+    defer vr.deinit();
+    try std.testing.expect(vr.valid);
+}
+
+test "allOf: invalid when any subschema fails" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    var vr = try parseAndValidateKeywords(arena.allocator(),
+        \\{"allOf":[{"type":"object","properties":{"x":{"type":"integer"}}},{"type":"object","required":["x"]}]}
+    , "{}", false);
+    defer vr.deinit();
+    try std.testing.expect(!vr.valid);
+}
+
+test "anyOf: valid when one subschema passes" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    var vr = try parseAndValidateKeywords(arena.allocator(),
+        \\{"anyOf":[{"type":"string"},{"type":"integer"}]}
+    , "42", false);
+    defer vr.deinit();
+    try std.testing.expect(vr.valid);
+}
+
+test "anyOf: invalid when no subschema passes" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    var vr = try parseAndValidateKeywords(arena.allocator(),
+        \\{"anyOf":[{"type":"string"},{"type":"integer"}]}
+    , "true", false);
+    defer vr.deinit();
+    try std.testing.expect(!vr.valid);
+}
+
+test "oneOf: valid when exactly one subschema passes" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    var vr = try parseAndValidateKeywords(arena.allocator(),
+        \\{"oneOf":[{"type":"string"},{"type":"integer"}]}
+    , "42", false);
+    defer vr.deinit();
+    try std.testing.expect(vr.valid);
+}
+
+test "oneOf: invalid when more than one subschema passes" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    var vr = try parseAndValidateKeywords(arena.allocator(),
+        \\{"oneOf":[{"type":"number"},{"type":"integer"}]}
+    , "42", false);
+    defer vr.deinit();
+    try std.testing.expect(!vr.valid);
+}
+
+test "not: valid when subschema fails" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    var vr = try parseAndValidateKeywords(arena.allocator(),
+        \\{"not":{"type":"string"}}
+    , "42", false);
+    defer vr.deinit();
+    try std.testing.expect(vr.valid);
+}
+
+test "not: invalid when subschema passes" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    var vr = try parseAndValidateKeywords(arena.allocator(),
+        \\{"not":{"type":"string"}}
+    , "\"hello\"", false);
+    defer vr.deinit();
+    try std.testing.expect(!vr.valid);
+}
+
 // ---- generators/jsonschema tests ----
 
 test "jsonschema: round-trip preserves type and required" {

@@ -117,6 +117,9 @@ pub const Schema = struct {
 
     // string constraints
     format: Format = .none,
+    min_length: ?usize = null,
+    max_length: ?usize = null,
+    pattern: ?[]const u8 = null,
 
     // numeric constraints
     minimum: ?f64 = null,
@@ -124,6 +127,19 @@ pub const Schema = struct {
 
     // enum (null means no enum constraint)
     enum_values: ?[]const EnumValue = null,
+
+    // schema combiners
+    all_of: []const *Schema = &.{},
+    any_of: []const *Schema = &.{},
+    one_of: []const *Schema = &.{},
+    not: ?*Schema = null,
+
+    // additional properties:
+    //   forbidden=false, schema=null  → allow any extra properties (default)
+    //   forbidden=true,  schema=null  → additionalProperties: false
+    //   forbidden=false, schema=*S    → validate extra properties against S
+    additional_properties_forbidden: bool = false,
+    additional_properties_schema: ?*Schema = null,
 
     // unresolved $ref path (e.g. "#/$defs/Foo")
     ref: ?[]const u8 = null,

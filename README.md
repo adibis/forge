@@ -223,10 +223,17 @@ forge supports a subset of JSON Schema draft-07:
 |---------|-------|
 | `type` | `string`, `integer`, `number`, `boolean`, `array`, `object`, `null` |
 | `properties`, `required` | Object shape validation |
+| `additionalProperties` | `false` to forbid extra fields; or a schema to validate them against |
 | `items` | Array element schema |
 | `enum` | Allowed values; fuzzy case-match applied on `fix` |
 | `format` | `email`, `uuid`, `date`, `date-time`, `uri` |
 | `minimum`, `maximum` | Numeric bounds |
+| `minLength`, `maxLength` | String length bounds |
+| `pattern` | Stored and surfaced as a warning; regex evaluation not yet supported |
+| `allOf` | Value must be valid against all subschemas |
+| `anyOf` | Value must be valid against at least one subschema |
+| `oneOf` | Value must be valid against exactly one subschema |
+| `not` | Value must not be valid against the subschema |
 | `$ref`, `$defs`, `definitions` | Schema references and reusable definitions |
 | nullable | `{"type": ["string", "null"]}` |
 
@@ -303,8 +310,7 @@ These are the planned directions for forge, in rough priority order.
 - YAML schema input (`--schema model.yaml`)
 - `--output <file>` flag on all subcommands
 - Streaming input support (validate as tokens arrive)
-- Additional JSON Schema keywords: `allOf`, `anyOf`, `oneOf`, `not`,
-  `minLength`/`maxLength`, `pattern`, `additionalProperties`
+- Full `pattern` support (regex evaluation)
 
 **Medium term — libforge**
 

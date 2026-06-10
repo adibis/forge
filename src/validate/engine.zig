@@ -141,6 +141,21 @@ pub const Engine = struct {
         if (schema.minimum != null or schema.maximum != null) {
             try self.validateRange(out, schema, path, result);
         }
+        if (out == .string) {
+            try self.validateStringConstraints(out.string, schema, path, result);
+        }
+        for (schema.all_of) |sub| {
+            out = try self.validateValue(out, sub, path, result, coerce);
+        }
+        if (schema.any_of.len > 0) {
+            out = try self.validateAnyOf(out, schema.any_of, path, result, coerce);
+        }
+        if (schema.one_of.len > 0) {
+            out = try self.validateOneOf(out, schema.one_of, path, result, coerce);
+        }
+        if (schema.not) |not_schema| {
+            try self.validateNot(out, not_schema, path, result);
+        }
         return out;
     }
 
@@ -335,6 +350,22 @@ pub const Engine = struct {
             if (schema.getProperty(key)) |prop_schema| {
                 const out_val = try self.validateValue(child_val, prop_schema, cp, result, coerce);
                 try out_obj.put(a, key, out_val);
+            } else if (schema.additional_properties_schema) |ap_schema| {
+                const out_val = try self.validateValue(child_val, ap_schema, cp, result, coerce);
+                try out_obj.put(a, key, out_val);
+            } else if (schema.additional_properties_forbidden) {
+                result.valid = false;
+                try result.errors.append(a, .{
+                    .field = key, .path = cp,
+                    .expected = "not present",
+                    .received_type = jsonTypeLabel(child_val),
+                    .received_value = try jsonValueRepr(a, child_val),
+                    .coercible = coerce,
+                    .coerced_to = if (coerce) "(removed)" else null,
+                    .message = try std.fmt.allocPrint(a,
+                        "field '{s}' is not allowed (additionalProperties: false)", .{key}),
+                });
+                if (!coerce) try out_obj.put(a, key, child_val);
             } else if (coerce) {
                 try result.warnings.append(a, try std.fmt.allocPrint(a,
                     "field '{s}' (path: {s}) not in schema, stripped", .{ key, cp }));
@@ -396,6 +427,139 @@ pub const Engine = struct {
                 .message = try std.fmt.allocPrint(a,
                     "field '{s}' value \"{s}\" does not match format '{s}'",
                     .{ field, s, fmt.label() }),
+            });
+        }
+    }
+
+    fn validateStringConstraints(
+        self: *Engine,
+        s: []const u8,
+        schema: *const ir.Schema,
+        path: []const u8,
+        result: *ValidationResult,
+    ) !void {
+        const a = self.arena;
+        const field = fieldFromPath(path);
+        if (schema.min_length) |min| {
+            if (s.len < min) {
+                result.valid = false;
+                try result.errors.append(a, .{
+                    .field = field, .path = path,
+                    .expected = try std.fmt.allocPrint(a, "length >= {d}", .{min}),
+                    .received_type = "string",
+                    .received_value = try std.fmt.allocPrint(a, "\"{s}\"", .{s}),
+                    .coercible = false, .coerced_to = null,
+                    .message = try std.fmt.allocPrint(a,
+                        "field '{s}' length {d} is less than minLength {d}",
+                        .{ field, s.len, min }),
+                });
+            }
+        }
+        if (schema.max_length) |max| {
+            if (s.len > max) {
+                result.valid = false;
+                try result.errors.append(a, .{
+                    .field = field, .path = path,
+                    .expected = try std.fmt.allocPrint(a, "length <= {d}", .{max}),
+                    .received_type = "string",
+                    .received_value = try std.fmt.allocPrint(a, "\"{s}\"", .{s}),
+                    .coercible = false, .coerced_to = null,
+                    .message = try std.fmt.allocPrint(a,
+                        "field '{s}' length {d} exceeds maxLength {d}",
+                        .{ field, s.len, max }),
+                });
+            }
+        }
+        if (schema.pattern != null) {
+            try result.warnings.append(a, try std.fmt.allocPrint(a,
+                "field '{s}': pattern validation is not yet supported", .{field}));
+        }
+    }
+
+    fn validateAnyOf(
+        self: *Engine,
+        value: std.json.Value,
+        schemas: []const *ir.Schema,
+        path: []const u8,
+        result: *ValidationResult,
+        coerce: bool,
+    ) error{OutOfMemory}!std.json.Value {
+        for (schemas) |sub| {
+            var temp = ValidationResult.init(self.arena);
+            defer temp.deinit();
+            const out = try self.validateValue(value, sub, path, &temp, coerce);
+            if (temp.errors.items.len == 0) return out;
+        }
+        result.valid = false;
+        const field = fieldFromPath(path);
+        try result.errors.append(self.arena, .{
+            .field = field, .path = path,
+            .expected = "match at least one subschema (anyOf)",
+            .received_type = jsonTypeLabel(value),
+            .received_value = try jsonValueRepr(self.arena, value),
+            .coercible = false, .coerced_to = null,
+            .message = try std.fmt.allocPrint(self.arena,
+                "field '{s}' does not match any subschema (anyOf)", .{field}),
+        });
+        return value;
+    }
+
+    fn validateOneOf(
+        self: *Engine,
+        value: std.json.Value,
+        schemas: []const *ir.Schema,
+        path: []const u8,
+        result: *ValidationResult,
+        coerce: bool,
+    ) error{OutOfMemory}!std.json.Value {
+        var match_count: usize = 0;
+        var matched_value = value;
+        for (schemas) |sub| {
+            var temp = ValidationResult.init(self.arena);
+            defer temp.deinit();
+            const out = try self.validateValue(value, sub, path, &temp, coerce);
+            if (temp.errors.items.len == 0) {
+                match_count += 1;
+                matched_value = out;
+            }
+        }
+        if (match_count == 1) return matched_value;
+        result.valid = false;
+        const field = fieldFromPath(path);
+        try result.errors.append(self.arena, .{
+            .field = field, .path = path,
+            .expected = "match exactly one subschema (oneOf)",
+            .received_type = jsonTypeLabel(value),
+            .received_value = try jsonValueRepr(self.arena, value),
+            .coercible = false, .coerced_to = null,
+            .message = try std.fmt.allocPrint(self.arena,
+                "field '{s}' matches {d} subschemas, expected exactly 1 (oneOf)",
+                .{ field, match_count }),
+        });
+        return value;
+    }
+
+    fn validateNot(
+        self: *Engine,
+        value: std.json.Value,
+        not_schema: *const ir.Schema,
+        path: []const u8,
+        result: *ValidationResult,
+    ) !void {
+        var temp = ValidationResult.init(self.arena);
+        defer temp.deinit();
+        _ = try self.validateValue(value, not_schema, path, &temp, false);
+        if (temp.errors.items.len == 0) {
+            result.valid = false;
+            const field = fieldFromPath(path);
+            try result.errors.append(self.arena, .{
+                .field = field, .path = path,
+                .expected = "not match subschema (not)",
+                .received_type = jsonTypeLabel(value),
+                .received_value = try jsonValueRepr(self.arena, value),
+                .coercible = false, .coerced_to = null,
+                .message = try std.fmt.allocPrint(self.arena,
+                    "field '{s}' must not match the 'not' subschema", .{field}),
             });
         }
     }
