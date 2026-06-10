@@ -525,3 +525,4 @@ fn isValidIpv4(s: []const u8) bool {
     }
     return count == 4;
 }
+

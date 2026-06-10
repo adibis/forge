@@ -41,11 +41,14 @@ pub fn build(b: *std.Build) void {
 
     // Test suite
     const test_modules = [_]struct { name: []const u8, path: []const u8 }{
-        .{ .name = "schema-ir",      .path = "src/schema/ir.zig" },
-        .{ .name = "schema-loader",  .path = "src/schema/loader.zig" },
-        .{ .name = "parse-extract",  .path = "src/parse/extract.zig" },
-        .{ .name = "parse-json",     .path = "src/parse/json.zig" },
-        .{ .name = "levenshtein",    .path = "src/util/levenshtein.zig" },
+        // standalone modules (no cross-directory imports)
+        .{ .name = "schema-ir",     .path = "src/schema/ir.zig" },
+        .{ .name = "schema-loader", .path = "src/schema/loader.zig" },
+        .{ .name = "parse-extract", .path = "src/parse/extract.zig" },
+        .{ .name = "parse-json",    .path = "src/parse/json.zig" },
+        .{ .name = "levenshtein",   .path = "src/util/levenshtein.zig" },
+        // cross-module tests (engine, generate, errors — all via src/tests.zig)
+        .{ .name = "integration",   .path = "src/tests.zig" },
     };
     const test_step = b.step("test", "Run all tests");
     for (test_modules) |m| {
