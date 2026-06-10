@@ -186,3 +186,43 @@ test "truncated json" {
     const err = parseLenient(std.testing.allocator, "{\"a\": 1");
     try std.testing.expectError(error.TruncatedJson, err);
 }
+
+test "bom stripped" {
+    var result = try parseLenient(std.testing.allocator, "\xEF\xBB\xBF{\"x\": 1}");
+    defer result.deinit();
+    try std.testing.expect(result.value == .object);
+    try std.testing.expect(result.was_repaired);
+}
+
+test "combined repairs: fence + trailing comma" {
+    const input = "```json\n{\"a\": 1,}\n```";
+    var result = try parseLenient(std.testing.allocator, input);
+    defer result.deinit();
+    try std.testing.expect(result.value == .object);
+    try std.testing.expect(result.was_repaired);
+}
+
+test "single quotes inside nested object" {
+    var result = try parseLenient(std.testing.allocator, "{'outer': {'inner': 'val'}}");
+    defer result.deinit();
+    try std.testing.expect(result.value == .object);
+    const outer = result.value.object.get("outer").?;
+    try std.testing.expect(outer == .object);
+}
+
+test "array input" {
+    var result = try parseLenient(std.testing.allocator, "[1, 2, 3]");
+    defer result.deinit();
+    try std.testing.expect(result.value == .array);
+    try std.testing.expectEqual(@as(usize, 3), result.value.array.items.len);
+}
+
+test "truncated array" {
+    const err = parseLenient(std.testing.allocator, "[1, 2");
+    try std.testing.expectError(error.TruncatedJson, err);
+}
+
+test "invalid non-json returns error" {
+    const err = parseLenient(std.testing.allocator, "hello world");
+    try std.testing.expectError(error.InvalidJson, err);
+}
