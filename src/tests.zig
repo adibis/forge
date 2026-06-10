@@ -5,10 +5,10 @@ const loader = @import("schema/loader.zig");
 const json_parse = @import("parse/json.zig");
 const engine_mod = @import("validate/engine.zig");
 const report_mod = @import("errors/report.zig");
-const gen_pydantic = @import("generate/pydantic.zig");
-const gen_ts = @import("generate/typescript.zig");
-const gen_zig = @import("generate/zig_struct.zig");
-const gen_jsonschema = @import("generate/jsonschema.zig");
+const gen_pydantic = @import("generators/pydantic.zig");
+const gen_ts = @import("generators/typescript.zig");
+const gen_zig = @import("generators/zig_struct.zig");
+const gen_jsonschema = @import("generators/jsonschema.zig");
 
 // ---- engine tests ----
 
@@ -251,7 +251,7 @@ test "report: coercions reflected in response" {
     try std.testing.expectEqualStrings("$.n", resp.coercions[0].path);
 }
 
-// ---- generate/pydantic tests ----
+// ---- generators/pydantic tests ----
 
 fn collectOutput(comptime genFn: anytype, args: anytype) ![]const u8 {
     var aw: std.Io.Writer.Allocating = .init(std.testing.allocator);
@@ -305,7 +305,7 @@ test "pydantic: optional field uses Optional" {
     try std.testing.expect(std.mem.containsAtLeast(u8, out, 1, "Optional[str]"));
 }
 
-// ---- generate/typescript tests ----
+// ---- generators/typescript tests ----
 
 test "typescript: object produces zod schema" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
@@ -338,7 +338,7 @@ test "typescript: enum field produces z.enum" {
     try std.testing.expect(std.mem.containsAtLeast(u8, out, 1, "\"admin\""));
 }
 
-// ---- generate/zig_struct tests ----
+// ---- generators/zig_struct tests ----
 
 test "zig: struct has correct field types" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
@@ -371,7 +371,7 @@ test "zig: string enum generates enum type" {
     try std.testing.expect(std.mem.containsAtLeast(u8, out, 1, "red,"));
 }
 
-// ---- generate/jsonschema tests ----
+// ---- generators/jsonschema tests ----
 
 test "jsonschema: round-trip preserves type and required" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);

@@ -6,10 +6,10 @@ const json_parse = @import("parse/json.zig");
 const engine_mod = @import("validate/engine.zig");
 const report = @import("errors/report.zig");
 const retry_loop = @import("retry/loop.zig");
-const gen_pydantic = @import("generate/pydantic.zig");
-const gen_typescript = @import("generate/typescript.zig");
-const gen_zig = @import("generate/zig_struct.zig");
-const gen_jsonschema = @import("generate/jsonschema.zig");
+const gen_pydantic = @import("generators/pydantic.zig");
+const gen_typescript = @import("generators/typescript.zig");
+const gen_zig = @import("generators/zig_struct.zig");
+const gen_jsonschema = @import("generators/jsonschema.zig");
 
 const usage =
     \\forge — LLM output validator and repair tool
