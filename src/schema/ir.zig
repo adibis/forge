@@ -136,6 +136,10 @@ pub const Schema = struct {
     one_of: []const *Schema = &.{},
     not: ?*Schema = null,
 
+    // object size constraints
+    min_properties: ?usize = null,
+    max_properties: ?usize = null,
+
     // additional properties:
     //   forbidden=false, schema=null  → allow any extra properties (default)
     //   forbidden=true,  schema=null  → additionalProperties: false

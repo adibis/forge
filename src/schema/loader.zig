@@ -167,6 +167,13 @@ pub fn loadSchema(root: *ir.SchemaRoot, val: std.json.Value) LoadError!ir.Schema
         schema.not = child;
     }
 
+    if (obj.get("minProperties")) |v| {
+        if (jsonToUsize(v)) |n| schema.min_properties = n;
+    }
+    if (obj.get("maxProperties")) |v| {
+        if (jsonToUsize(v)) |n| schema.max_properties = n;
+    }
+
     if (obj.get("additionalProperties")) |v| {
         switch (v) {
             .bool => |b| { if (!b) schema.additional_properties_forbidden = true; },

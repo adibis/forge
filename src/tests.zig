@@ -579,6 +579,50 @@ test "minItems: works without items schema" {
     try std.testing.expect(!vr.valid);
 }
 
+// ---- minProperties / maxProperties tests ----
+
+test "minProperties: accepts object at exact minimum" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    var vr = try parseAndValidateKeywords(arena.allocator(),
+        \\{"type":"object","minProperties":2}
+    , "{\"a\":1,\"b\":2}", false);
+    defer vr.deinit();
+    try std.testing.expect(vr.valid);
+}
+
+test "minProperties: rejects object below minimum" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    var vr = try parseAndValidateKeywords(arena.allocator(),
+        \\{"type":"object","minProperties":3}
+    , "{\"a\":1}", false);
+    defer vr.deinit();
+    try std.testing.expect(!vr.valid);
+    try std.testing.expectEqual(@as(usize, 1), vr.errors.items.len);
+}
+
+test "maxProperties: accepts object at exact maximum" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    var vr = try parseAndValidateKeywords(arena.allocator(),
+        \\{"type":"object","maxProperties":2}
+    , "{\"a\":1,\"b\":2}", false);
+    defer vr.deinit();
+    try std.testing.expect(vr.valid);
+}
+
+test "maxProperties: rejects object above maximum" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    var vr = try parseAndValidateKeywords(arena.allocator(),
+        \\{"type":"object","maxProperties":1}
+    , "{\"a\":1,\"b\":2}", false);
+    defer vr.deinit();
+    try std.testing.expect(!vr.valid);
+    try std.testing.expectEqual(@as(usize, 1), vr.errors.items.len);
+}
+
 // ---- generators/jsonschema tests ----
 
 test "jsonschema: round-trip preserves type and required" {

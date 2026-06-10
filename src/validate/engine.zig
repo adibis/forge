@@ -324,6 +324,40 @@ pub const Engine = struct {
     ) error{OutOfMemory}!std.json.Value {
         if (value != .object) return value;
         const a = self.arena;
+        const prop_count = value.object.count();
+        const field = fieldFromPath(path);
+
+        if (schema.min_properties) |min| {
+            if (prop_count < min) {
+                result.valid = false;
+                try result.errors.append(a, .{
+                    .field = field, .path = path,
+                    .expected = try std.fmt.allocPrint(a, ">= {d} properties", .{min}),
+                    .received_type = "object",
+                    .received_value = try std.fmt.allocPrint(a, "({d} properties)", .{prop_count}),
+                    .coercible = false, .coerced_to = null,
+                    .message = try std.fmt.allocPrint(a,
+                        "object '{s}' has {d} properties, expected at least {d} (minProperties)",
+                        .{ field, prop_count, min }),
+                });
+            }
+        }
+        if (schema.max_properties) |max| {
+            if (prop_count > max) {
+                result.valid = false;
+                try result.errors.append(a, .{
+                    .field = field, .path = path,
+                    .expected = try std.fmt.allocPrint(a, "<= {d} properties", .{max}),
+                    .received_type = "object",
+                    .received_value = try std.fmt.allocPrint(a, "({d} properties)", .{prop_count}),
+                    .coercible = false, .coerced_to = null,
+                    .message = try std.fmt.allocPrint(a,
+                        "object '{s}' has {d} properties, expected at most {d} (maxProperties)",
+                        .{ field, prop_count, max }),
+                });
+            }
+        }
+
         var out_obj: std.json.ObjectMap = .{};
 
         for (schema.required) |req| {
