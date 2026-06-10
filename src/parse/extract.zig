@@ -102,3 +102,39 @@ test "plain json passthrough" {
     const result = extractJson(input);
     try std.testing.expectEqualStrings("{\"x\": 1}", result);
 }
+
+test "extract from unlabeled fence" {
+    const input = "```\n{\"a\": 1}\n```";
+    const result = extractJson(input);
+    try std.testing.expectEqualStrings("{\"a\": 1}", result);
+}
+
+test "extract array from fence" {
+    const input = "```json\n[1, 2, 3]\n```";
+    const result = extractJson(input);
+    try std.testing.expectEqualStrings("[1, 2, 3]", result);
+}
+
+test "extract array from prose" {
+    const input = "Result: [1, 2, 3] end.";
+    const result = extractJson(input);
+    try std.testing.expectEqualStrings("[1, 2, 3]", result);
+}
+
+test "braces inside string not confused for bounds" {
+    const input = "{\"msg\": \"say {hello}\"}";
+    const result = extractJson(input);
+    try std.testing.expectEqualStrings("{\"msg\": \"say {hello}\"}", result);
+}
+
+test "leading and trailing whitespace stripped" {
+    const input = "  \n  {\"x\": 1}  \n  ";
+    const result = extractJson(input);
+    try std.testing.expectEqualStrings("{\"x\": 1}", result);
+}
+
+test "nested object in prose" {
+    const input = "Here: {\"a\": {\"b\": 2}} done.";
+    const result = extractJson(input);
+    try std.testing.expectEqualStrings("{\"a\": {\"b\": 2}}", result);
+}
