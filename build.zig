@@ -10,9 +10,10 @@ pub fn build(b: *std.Build) void {
     const include_anthropic = b.option(bool, "anthropiclient", "Include built-in Anthropic provider (default: true)") orelse true;
 
     const build_opts = b.addOptions();
-    build_opts.addOption(bool, "include_ollama",    include_ollama);
-    build_opts.addOption(bool, "include_openai",    include_openai);
-    build_opts.addOption(bool, "include_anthropic", include_anthropic);
+    build_opts.addOption(bool,          "include_ollama",    include_ollama);
+    build_opts.addOption(bool,          "include_openai",    include_openai);
+    build_opts.addOption(bool,          "include_anthropic", include_anthropic);
+    build_opts.addOption([]const u8,    "version",           "0.1.0");
 
     // Main forge binary
     const exe = b.addExecutable(.{

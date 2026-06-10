@@ -1,6 +1,7 @@
 const std = @import("std");
 const Io = std.Io;
 
+const build_options = @import("build_options");
 const loader = @import("schema/loader.zig");
 const json_parse = @import("parse/json.zig");
 const engine_mod = @import("validate/engine.zig");
@@ -54,6 +55,10 @@ pub fn main(init: std.process.Init) !void {
 
     if (std.mem.eql(u8, subcmd, "--help") or std.mem.eql(u8, subcmd, "help")) {
         try Io.File.stdout().writeStreamingAll(io, usage);
+        return;
+    }
+    if (std.mem.eql(u8, subcmd, "--version") or std.mem.eql(u8, subcmd, "version")) {
+        try Io.File.stdout().writeStreamingAll(io, "forge " ++ build_options.version ++ "\n");
         return;
     }
 

@@ -114,6 +114,11 @@ copy to the device.
 
 ## Usage
 
+```sh
+forge --version   # forge 0.1.0
+forge --help
+```
+
 ### validate
 
 Check whether JSON conforms to a schema. Prints a structured report to stdout.
