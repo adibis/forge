@@ -5,12 +5,14 @@ const json_parse = @import("../parse/json.zig");
 const engine_mod = @import("../validate/engine.zig");
 const report = @import("../errors/report.zig");
 const plugin = @import("plugin.zig");
+const dispatch = @import("../providers/dispatch.zig");
 
 pub const RetryOptions = struct {
     provider: []const u8,
     max_retries: u32 = 3,
     schema_json: []const u8,
     verbose: bool = false,
+    env: *const std.process.Environ.Map,
 };
 
 pub const RetryResult = struct {
@@ -113,15 +115,7 @@ fn callProviderForRetry(
         .previous_errors = &.{},
         .attempt_number = attempt,
     };
-    const response = plugin.callPlugin(gpa, io, opts.provider, req) catch |e| {
-        return switch (e) {
-            error.PluginNotFound => blk: {
-                std.log.err("provider 'forge-provider-{s}' not found on PATH", .{opts.provider});
-                break :blk error.PluginNotFound;
-            },
-            else => e,
-        };
-    };
+    const response = try dispatch.call(gpa, io, opts.provider, req, opts.env);
     defer gpa.free(response);
     return arena.dupe(u8, response);
 }

@@ -4,6 +4,16 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
+    // Provider compile-time flags (all default true)
+    const include_ollama    = b.option(bool, "ollama",    "Include built-in Ollama provider (default: true)")    orelse true;
+    const include_openai    = b.option(bool, "openai",    "Include built-in OpenAI provider (default: true)")    orelse true;
+    const include_anthropic = b.option(bool, "anthropiclient", "Include built-in Anthropic provider (default: true)") orelse true;
+
+    const build_opts = b.addOptions();
+    build_opts.addOption(bool, "include_ollama",    include_ollama);
+    build_opts.addOption(bool, "include_openai",    include_openai);
+    build_opts.addOption(bool, "include_anthropic", include_anthropic);
+
     // Main forge binary
     const exe = b.addExecutable(.{
         .name = "forge",
@@ -13,6 +23,7 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
         }),
     });
+    exe.root_module.addOptions("build_options", build_opts);
     b.installArtifact(exe);
 
     const run_cmd = b.addRunArtifact(exe);
@@ -20,24 +31,6 @@ pub fn build(b: *std.Build) void {
     if (b.args) |args| run_cmd.addArgs(args);
     const run_step = b.step("run", "Run forge");
     run_step.dependOn(&run_cmd.step);
-
-    // Provider binaries
-    const providers = [_]struct { name: []const u8, path: []const u8 }{
-        .{ .name = "forge-provider-anthropic", .path = "providers/anthropic/main.zig" },
-        .{ .name = "forge-provider-openai",    .path = "providers/openai/main.zig" },
-        .{ .name = "forge-provider-ollama",    .path = "providers/ollama/main.zig" },
-    };
-    for (providers) |p| {
-        const provider_exe = b.addExecutable(.{
-            .name = p.name,
-            .root_module = b.createModule(.{
-                .root_source_file = b.path(p.path),
-                .target = target,
-                .optimize = optimize,
-            }),
-        });
-        b.installArtifact(provider_exe);
-    }
 
     // Test suite
     const test_modules = [_]struct { name: []const u8, path: []const u8 }{

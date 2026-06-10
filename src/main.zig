@@ -59,7 +59,7 @@ pub fn main(init: std.process.Init) !void {
     if (std.mem.eql(u8, subcmd, "validate") or std.mem.eql(u8, subcmd, "fix")) {
         try runValidateOrFix(gpa, io, args[2..], std.mem.eql(u8, subcmd, "fix"));
     } else if (std.mem.eql(u8, subcmd, "retry")) {
-        try runRetry(gpa, io, args[2..], init.environ_map.*);
+        try runRetry(gpa, io, args[2..], init.environ_map);
     } else if (std.mem.eql(u8, subcmd, "generate")) {
         try runGenerate(gpa, io, args[2..]);
     } else {
@@ -132,7 +132,7 @@ fn runValidateOrFix(
 
 // --- retry ---
 
-fn runRetry(gpa: std.mem.Allocator, io: Io, args: []const [:0]const u8, env: std.process.Environ.Map) !void {
+fn runRetry(gpa: std.mem.Allocator, io: Io, args: []const [:0]const u8, env: *const std.process.Environ.Map) !void {
     var schema_path: ?[]const u8 = null;
     var input_path: ?[]const u8 = null;
     var provider: ?[]const u8 = null;
@@ -171,6 +171,7 @@ fn runRetry(gpa: std.mem.Allocator, io: Io, args: []const [:0]const u8, env: std
         .max_retries = max_retries,
         .schema_json = schema_text,
         .verbose = env.get("FORGE_VERBOSE") != null,
+        .env = env,
     }) catch |e| {
         exitWithErrorFmt(gpa, io, 4, "retry-error", "retry failed: {s}", .{@errorName(e)});
     };

@@ -62,13 +62,27 @@ cd forge
 zig build -Doptimize=ReleaseFast
 ```
 
-Binaries land in `zig-out/bin/`:
-- `forge` — main tool
-- `forge-provider-anthropic`
-- `forge-provider-openai`
-- `forge-provider-ollama`
+One binary lands in `zig-out/bin/forge`. Copy it anywhere on your `$PATH`.
 
-Copy them anywhere on your `$PATH`.
+The three built-in providers (Anthropic, OpenAI, Ollama) are compiled directly into
+the binary. Use build flags to include only the ones you need:
+
+```sh
+# Ollama only — smallest binary, no cloud API code
+zig build -Doptimize=ReleaseFast -Dopenai=false -Danthropiclient=false
+
+# Anthropic + OpenAI, no Ollama
+zig build -Doptimize=ReleaseFast -Dollama=false
+```
+
+**Cross-compile for Raspberry Pi Zero 2W (aarch64-linux-musl):**
+
+```sh
+zig build -Dtarget=aarch64-linux-musl -Doptimize=ReleaseFast -Dopenai=false -Danthropiclient=false
+```
+
+This produces a fully static ARM64 binary with only the Ollama provider, ready to
+copy to the device.
 
 ---
 
@@ -241,11 +255,14 @@ forge supports a subset of JSON Schema draft-07:
 
 ## Custom providers
 
-A provider is any executable named `forge-provider-<name>` on your `$PATH`.
-forge spawns it, writes a JSON request to its stdin, and reads a JSON response
-from its stdout.
+There are two ways to add a provider: subprocess (no rebuild) or compiled-in (smaller binary).
 
-**Request** (stdin):
+### Option 1 — subprocess provider (no rebuild required)
+
+Put any executable named `forge-provider-<name>` on your `$PATH`. forge will
+spawn it for any provider name that isn't built in.
+
+**Request** (written to stdin):
 ```json
 {
   "prompt": "...",
@@ -255,15 +272,45 @@ from its stdout.
 }
 ```
 
-**Response** (stdout):
+**Response** (read from stdout):
 ```json
 {"response": "..."}
 ```
 
-On error:
+On error, write to stdout and exit non-zero:
 ```json
 {"error": "reason"}
 ```
+
+### Option 2 — compiled-in provider
+
+1. Implement `src/providers/myprovider.zig` with a `call` function matching this
+   signature:
+
+   ```zig
+   pub fn call(
+       gpa: std.mem.Allocator,
+       io: std.Io,
+       req: plugin.PluginRequest,
+       env: *const std.process.Environ.Map,
+   ) ![]const u8
+   ```
+
+   Return a `gpa`-allocated string containing the raw LLM response text (not
+   JSON-wrapped). See `src/providers/ollama.zig` for a reference implementation.
+
+2. Add a dispatch branch in `src/providers/dispatch.zig`:
+
+   ```zig
+   if (std.mem.eql(u8, provider_name, "myprovider")) {
+       return @import("myprovider.zig").call(gpa, io, req, env);
+   }
+   ```
+
+3. Rebuild: `zig build -Doptimize=ReleaseFast`
+
+The built-in providers (`ollama`, `openai`, `anthropic`) follow the same pattern and
+are good reference implementations.
 
 ---
 
