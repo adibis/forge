@@ -11,19 +11,19 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            zig_host: linux-x86_64
+            zig_host: x86_64-linux
             target: x86_64-linux-musl
             asset: forge-linux-x86_64
           - os: ubuntu-latest
-            zig_host: linux-x86_64
+            zig_host: x86_64-linux
             target: aarch64-linux-musl
             asset: forge-linux-aarch64
           - os: macos-latest
-            zig_host: macos-aarch64
+            zig_host: aarch64-macos
             target: aarch64-macos
             asset: forge-darwin-arm64
           - os: macos-latest
-            zig_host: macos-aarch64
+            zig_host: aarch64-macos
             target: x86_64-macos
             asset: forge-darwin-x86_64
     runs-on: ${{ matrix.os }}
