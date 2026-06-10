@@ -515,6 +515,50 @@ test "not: invalid when subschema passes" {
     try std.testing.expect(!vr.valid);
 }
 
+// ---- pattern tests ----
+
+test "pattern: matches valid value" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    var vr = try parseAndValidateKeywords(arena.allocator(),
+        \\{"type":"string","pattern":"^[0-9]{3}-[0-9]{4}$"}
+    , "\"555-1234\"", false);
+    defer vr.deinit();
+    try std.testing.expect(vr.valid);
+}
+
+test "pattern: rejects non-matching value" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    var vr = try parseAndValidateKeywords(arena.allocator(),
+        \\{"type":"string","pattern":"^[0-9]+$"}
+    , "\"abc\"", false);
+    defer vr.deinit();
+    try std.testing.expect(!vr.valid);
+    try std.testing.expectEqual(@as(usize, 1), vr.errors.items.len);
+}
+
+test "pattern: invalid regex becomes warning not error" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    var vr = try parseAndValidateKeywords(arena.allocator(),
+        \\{"type":"string","pattern":"[invalid"}
+    , "\"anything\"", false);
+    defer vr.deinit();
+    try std.testing.expect(vr.valid);
+    try std.testing.expect(vr.warnings.items.len > 0);
+}
+
+test "pattern: partial match (substring)" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    var vr = try parseAndValidateKeywords(arena.allocator(),
+        \\{"type":"string","pattern":"[0-9]+"}
+    , "\"abc123def\"", false);
+    defer vr.deinit();
+    try std.testing.expect(vr.valid);
+}
+
 // ---- minItems / maxItems tests ----
 
 test "minItems: accepts array at exact minimum" {

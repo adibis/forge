@@ -1,5 +1,6 @@
 const std = @import("std");
 const ir = @import("../schema/ir.zig");
+const c = @cImport(@cInclude("regex.h"));
 
 pub const ValidationError = struct {
     field: []const u8,
@@ -538,9 +539,28 @@ pub const Engine = struct {
                 });
             }
         }
-        if (schema.pattern != null) {
-            try result.warnings.append(a, try std.fmt.allocPrint(a,
-                "field '{s}': pattern validation is not yet supported", .{field}));
+        if (schema.pattern) |pattern| {
+            switch (matchesPattern(a, s, pattern)) {
+                .matches => {},
+                .no_match => {
+                    result.valid = false;
+                    try result.errors.append(a, .{
+                        .field = field, .path = path,
+                        .expected = try std.fmt.allocPrint(a, "matches pattern '{s}'", .{pattern}),
+                        .received_type = "string",
+                        .received_value = try std.fmt.allocPrint(a, "\"{s}\"", .{s}),
+                        .coercible = false, .coerced_to = null,
+                        .message = try std.fmt.allocPrint(a,
+                            "field '{s}' value \"{s}\" does not match pattern '{s}'",
+                            .{ field, s, pattern }),
+                    });
+                },
+                .invalid_pattern => {
+                    try result.warnings.append(a, try std.fmt.allocPrint(a,
+                        "field '{s}': pattern '{s}' is not valid POSIX ERE (skipped)",
+                        .{ field, pattern }));
+                },
+            }
         }
     }
 
@@ -721,6 +741,22 @@ fn enumLabel(arena: std.mem.Allocator, vals: []const ir.EnumValue) ![]const u8 {
     }
     try buf.append(arena, ']');
     return buf.toOwnedSlice(arena);
+}
+
+// --- pattern matching ---
+
+const PatternResult = enum { matches, no_match, invalid_pattern };
+
+fn matchesPattern(arena: std.mem.Allocator, s: []const u8, pattern: []const u8) PatternResult {
+    const pattern_z = arena.dupeZ(u8, pattern) catch return .invalid_pattern;
+    const s_z = arena.dupeZ(u8, s) catch return .invalid_pattern;
+
+    var preg: c.regex_t = undefined;
+    if (c.regcomp(&preg, pattern_z, c.REG_EXTENDED | c.REG_NOSUB) != 0)
+        return .invalid_pattern;
+    defer c.regfree(&preg);
+
+    return if (c.regexec(&preg, s_z, 0, null, 0) == 0) .matches else .no_match;
 }
 
 // --- format validators ---

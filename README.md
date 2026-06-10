@@ -274,7 +274,7 @@ forge supports a subset of JSON Schema draft-07:
 | `format` | `email`, `uuid`, `date`, `date-time`, `uri` |
 | `minimum`, `maximum` | Numeric bounds |
 | `minLength`, `maxLength` | String length bounds |
-| `pattern` | Stored and surfaced as a warning; regex evaluation not yet supported |
+| `pattern` | POSIX ERE evaluation via `regex.h`; invalid patterns surface as a warning |
 | `allOf` | Value must be valid against all subschemas |
 | `anyOf` | Value must be valid against at least one subschema |
 | `oneOf` | Value must be valid against exactly one subschema |
