@@ -34,6 +34,22 @@ forge handles all of these. It validates against a JSON Schema, applies safe
 coercions automatically, and — if you give it a provider — will re-prompt the
 model with a structured error message and retry until the output is clean.
 
+### Compared to other tools
+
+| Tool | Validates | Repairs | Retries | Requirement |
+|------|-----------|---------|---------|-------------|
+| **forge** | ✓ | ✓ | ✓ | static binary, no runtime |
+| [Instructor](https://github.com/instructor-ai/instructor) | ✓ | — | ✓ | Python or TypeScript library |
+| [jsonrepair](https://github.com/josdejong/jsonrepair) | — | ✓ | — | Node.js |
+| ajv / jsonschema | ✓ | — | — | Node.js or Python |
+| [Outlines](https://github.com/outlines-dev/outlines) | ✓ | — | — | Python + local model |
+| OpenAI structured outputs | ✓ | — | — | OpenAI API only |
+
+Instructor is the closest equivalent for Python codebases and handles the retry
+loop well. Outlines eliminates the problem at generation time if you control the
+model. forge's specific value is as a **language-agnostic binary**: drop it into
+a bash script, a Go service, a CI job, or any pipeline that isn't Python.
+
 ---
 
 ## Install
@@ -241,6 +257,70 @@ On error:
 ```json
 {"error": "reason"}
 ```
+
+---
+
+## Edge and embedded
+
+forge cross-compiles to any target Zig supports:
+
+```sh
+zig build -Dtarget=aarch64-linux-musl -Doptimize=ReleaseFast
+```
+
+`validate`, `fix`, and `generate` are fully self-contained — no network, no
+subprocess, no dynamic linking. A single static binary that runs on ARM devices,
+embedded Linux routers, and edge nodes where Python or Node runtimes are
+unavailable.
+
+`retry` requires spawning a provider subprocess and making HTTP calls to an LLM
+API. It works on any edge node with outbound connectivity. If you are running
+Ollama locally on the device, the full retry pipeline works there too.
+
+**Microcontrollers (ESP32 and similar)**
+
+People have run tiny models (100K–1M parameter, heavily quantized) directly on
+ESP32-S3 boards. The output validation problem is real in that context: a model
+that small will produce well-structured JSON sometimes and near-miss JSON other
+times. The `validate` and `fix` logic in forge — lenient parsing, type coercion,
+enum case-folding — is exactly what you need between the model and your
+application.
+
+The forge binary itself requires a POSIX environment and won't run on FreeRTOS.
+However the core algorithms (`parse/`, `validate/`, `schema/`) are pure Zig with
+allocator interfaces and no OS dependencies. Zig supports the RISC-V variants of
+ESP32 (C3, C6) natively, and Xtensa (ESP32, S3) via Espressif's Zig fork. A
+`libforge` build target that exposes the core as a linkable library — usable from
+ESP-IDF applications — is a planned milestone (see below).
+
+---
+
+## Goals
+
+These are the planned directions for forge, in rough priority order.
+
+**Near term**
+
+- YAML schema input (`--schema model.yaml`)
+- `--output <file>` flag on all subcommands
+- Streaming input support (validate as tokens arrive)
+
+**Medium term**
+
+- `libforge`: a static library build target exposing the core validate/fix/parse
+  logic as a C-compatible API. No CLI, no provider subprocess — just the
+  algorithms. Primary use case: linking into applications that cannot run a
+  subprocess, including ESP-IDF firmware, Go/Rust/C services, and WASM runtimes.
+
+- Additional JSON Schema keywords: `allOf`, `anyOf`, `oneOf`, `not`,
+  `minLength`/`maxLength`, `pattern`, `additionalProperties`
+
+**Longer term**
+
+- WASM build target for browser and edge-runtime use (Cloudflare Workers,
+  Deno Deploy)
+- ESP32 reference implementation: a working example of `libforge` embedded in an
+  ESP-IDF project running a tiny local model
 
 ---
 
