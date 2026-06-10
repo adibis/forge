@@ -17,6 +17,23 @@ echo "$llm_response" | forge fix --schema user.schema.json > fixed.json
 
 ---
 
+## Quick Start
+
+**macOS (Apple Silicon):**
+```sh
+curl -L https://github.com/adibis/forge/releases/latest/download/forge-darwin-arm64 -o forge
+chmod +x forge && sudo mv forge /usr/local/bin/forge
+echo '{"name":"Alice","age":"30"}' | forge fix --schema <(echo '{"properties":{"age":{"type":"integer"}}}')
+```
+
+**macOS (Intel):** replace `arm64` with `x86_64` in the URL above.
+
+**Linux x86_64:** replace `darwin-arm64` with `linux-x86_64`.
+
+**Linux aarch64 (Raspberry Pi Zero 2W, etc.):** replace `darwin-arm64` with `linux-aarch64`.
+
+---
+
 ## Why
 
 LLMs reliably produce *almost* valid JSON. The last mile failures are predictable:
@@ -54,15 +71,24 @@ a bash script, a Go service, a CI job, or any pipeline that isn't Python.
 
 ## Install
 
-Requires [Zig 0.16](https://ziglang.org/download/).
+**Pre-built binaries** are published with each [GitHub Release](https://github.com/adibis/forge/releases):
+
+| Platform | Download |
+|---|---|
+| macOS Apple Silicon | `forge-darwin-arm64` |
+| macOS Intel | `forge-darwin-x86_64` |
+| Linux x86\_64 | `forge-linux-x86_64` |
+| Linux aarch64 | `forge-linux-aarch64` |
+
+Linux binaries are statically linked (musl). macOS binaries link against the system libC only.
+
+**Build from source** — requires [Zig 0.16](https://ziglang.org/download/):
 
 ```sh
 git clone https://github.com/adibis/forge.git
-cd forge
-zig build -Doptimize=ReleaseFast
+cd forge && zig build -Doptimize=ReleaseFast
+sudo install -m755 zig-out/bin/forge /usr/local/bin/forge
 ```
-
-One binary lands in `zig-out/bin/forge`. Copy it anywhere on your `$PATH`.
 
 The three built-in providers (Anthropic, OpenAI, Ollama) are compiled directly into
 the binary. Use build flags to include only the ones you need:
