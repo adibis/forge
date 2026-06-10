@@ -71,3 +71,32 @@ test "closest enum" {
     try std.testing.expect(result != null);
     try std.testing.expectEqualStrings("active", result.?);
 }
+
+test "distance identical strings" {
+    const d = try distance(std.testing.allocator, "hello", "hello");
+    try std.testing.expectEqual(@as(usize, 0), d);
+}
+
+test "distance empty strings" {
+    try std.testing.expectEqual(@as(usize, 3), try distance(std.testing.allocator, "abc", ""));
+    try std.testing.expectEqual(@as(usize, 3), try distance(std.testing.allocator, "", "abc"));
+    try std.testing.expectEqual(@as(usize, 0), try distance(std.testing.allocator, "", ""));
+}
+
+test "distance single operations" {
+    try std.testing.expectEqual(@as(usize, 1), try distance(std.testing.allocator, "cat", "bat"));
+    try std.testing.expectEqual(@as(usize, 1), try distance(std.testing.allocator, "cat", "cats"));
+    try std.testing.expectEqual(@as(usize, 1), try distance(std.testing.allocator, "cats", "cat"));
+}
+
+test "closest exact case-insensitive match wins over levenshtein" {
+    const candidates = [_][]const u8{ "ACTIVE", "active", "pending" };
+    const result = try closest(std.testing.allocator, "ACTIVE", &candidates, 5);
+    try std.testing.expectEqualStrings("ACTIVE", result.?);
+}
+
+test "closest returns null when all too far" {
+    const candidates = [_][]const u8{ "cat", "dog" };
+    const result = try closest(std.testing.allocator, "elephant", &candidates, 2);
+    try std.testing.expect(result == null);
+}
