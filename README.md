@@ -1,10 +1,15 @@
 # forge
 
+LLMs are good at following instructions but unreliable about output format. When
+you ask a model for JSON, you might get the right data wrapped in a markdown fence,
+a number returned as a string, a missing required field, or output truncated at the
+token limit. Every team building on LLMs eventually writes the same cleanup code.
+forge is that code, as a static binary with no runtime dependencies.
+
 **forge** validates, repairs, and retries structured JSON output from LLMs.
 
-Drop it into any shell pipeline. No runtime, no SDK, no configuration files.
-Works with Python services, Go binaries, bash scripts, CI jobs — anything that
-can run a subprocess.
+Drop it into any shell pipeline. Works with Python services, Go binaries, bash
+scripts, CI jobs — anything that can run a subprocess.
 
 ```sh
 echo "$llm_response" | forge fix --schema user.schema.json > fixed.json
@@ -196,15 +201,18 @@ forge generate --schema user.schema.json --target jsonschema
 
 ## JSON Schema support
 
-forge accepts a subset of JSON Schema draft-07:
+forge supports a subset of JSON Schema draft-07:
 
-- Types: `string`, `integer`, `number`, `boolean`, `array`, `object`, `null`
-- `properties`, `required`, `items`
-- `enum`
-- `format`: `email`, `uuid`, `date`, `date-time`, `uri`
-- `minimum`, `maximum`
-- `$ref`, `$defs` / `definitions`
-- Nullable types: `{"type": ["string", "null"]}`
+| Keyword | Notes |
+|---------|-------|
+| `type` | `string`, `integer`, `number`, `boolean`, `array`, `object`, `null` |
+| `properties`, `required` | Object shape validation |
+| `items` | Array element schema |
+| `enum` | Allowed values; fuzzy case-match applied on `fix` |
+| `format` | `email`, `uuid`, `date`, `date-time`, `uri` |
+| `minimum`, `maximum` | Numeric bounds |
+| `$ref`, `$defs`, `definitions` | Schema references and reusable definitions |
+| nullable | `{"type": ["string", "null"]}` |
 
 ---
 
