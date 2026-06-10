@@ -8,7 +8,8 @@ pub const LoadError = error{
 };
 
 pub fn loadFromSlice(allocator: std.mem.Allocator, input: []const u8) LoadError!ir.SchemaRoot {
-    var root = ir.SchemaRoot.init(allocator);
+    var root: ir.SchemaRoot = undefined;
+    root.init(allocator);
     errdefer root.deinit();
     const arena = root.allocator();
 
@@ -161,6 +162,74 @@ fn jsonToEnumValue(arena: std.mem.Allocator, v: std.json.Value) LoadError!ir.Enu
         .null => .{ .null = {} },
         else => error.InvalidSchema,
     };
+}
+
+test "load nullable type array" {
+    const schema_json =
+        \\{"type": ["string", "null"]}
+    ;
+    var root = try loadFromSlice(std.testing.allocator, schema_json);
+    defer root.deinit();
+    try std.testing.expectEqual(ir.SchemaType.string, root.schema.type);
+    try std.testing.expect(root.schema.nullable);
+}
+
+test "load $ref" {
+    const schema_json =
+        \\{"$ref": "#/$defs/Address"}
+    ;
+    var root = try loadFromSlice(std.testing.allocator, schema_json);
+    defer root.deinit();
+    try std.testing.expect(root.schema.ref != null);
+    try std.testing.expectEqualStrings("#/$defs/Address", root.schema.ref.?);
+}
+
+test "load $defs and resolve" {
+    const schema_json =
+        \\{
+        \\  "type": "object",
+        \\  "properties": {"addr": {"$ref": "#/$defs/Address"}},
+        \\  "$defs": {
+        \\    "Address": {"type": "object", "properties": {"city": {"type": "string"}}}
+        \\  }
+        \\}
+    ;
+    var root = try loadFromSlice(std.testing.allocator, schema_json);
+    defer root.deinit();
+    try std.testing.expectEqual(@as(usize, 1), root.defs.count());
+    const resolved = root.resolve("#/$defs/Address");
+    try std.testing.expect(resolved != null);
+    try std.testing.expectEqual(ir.SchemaType.object, resolved.?.type);
+}
+
+test "load array schema with items" {
+    const schema_json =
+        \\{"type": "array", "items": {"type": "string"}}
+    ;
+    var root = try loadFromSlice(std.testing.allocator, schema_json);
+    defer root.deinit();
+    try std.testing.expectEqual(ir.SchemaType.array, root.schema.type);
+    try std.testing.expect(root.schema.items != null);
+    try std.testing.expectEqual(ir.SchemaType.string, root.schema.items.?.type);
+}
+
+test "load enum values" {
+    const schema_json =
+        \\{"type": "string", "enum": ["a", "b", "c"]}
+    ;
+    var root = try loadFromSlice(std.testing.allocator, schema_json);
+    defer root.deinit();
+    try std.testing.expect(root.schema.enum_values != null);
+    try std.testing.expectEqual(@as(usize, 3), root.schema.enum_values.?.len);
+}
+
+test "load format" {
+    const schema_json =
+        \\{"type": "string", "format": "email"}
+    ;
+    var root = try loadFromSlice(std.testing.allocator, schema_json);
+    defer root.deinit();
+    try std.testing.expectEqual(ir.Format.email, root.schema.format);
 }
 
 test "load simple schema" {

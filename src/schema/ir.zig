@@ -165,13 +165,13 @@ pub const SchemaRoot = struct {
     schema: Schema,
     defs: std.StringHashMap(*Schema),
 
-    pub fn init(child_allocator: std.mem.Allocator) SchemaRoot {
-        var arena = std.heap.ArenaAllocator.init(child_allocator);
-        return .{
-            .arena = arena,
-            .schema = .{},
-            .defs = std.StringHashMap(*Schema).init(arena.allocator()),
-        };
+    // Must be called on a variable that is already at its final address —
+    // the defs HashMap stores a pointer to self.arena, so moving the struct
+    // after init would leave a dangling pointer.
+    pub fn init(self: *SchemaRoot, child_allocator: std.mem.Allocator) void {
+        self.arena = std.heap.ArenaAllocator.init(child_allocator);
+        self.schema = .{};
+        self.defs = std.StringHashMap(*Schema).init(self.arena.allocator());
     }
 
     pub fn deinit(self: *SchemaRoot) void {
