@@ -55,15 +55,15 @@ jobs:
           path: artifacts
           merge-multiple: false
 
-      - name: Rename artifacts
+      - name: Flatten artifacts
         run: |
+          mkdir dist
           for dir in artifacts/*/; do
             name=$(basename "$dir")
-            mv "$dir/forge" "artifacts/$name"
-            rmdir "$dir"
+            mv "$dir/forge" "dist/$name"
           done
-          ls -lh artifacts/
+          ls -lh dist/
 
       - uses: softprops/action-gh-release@v2
         with:
-          files: artifacts/forge-*
+          files: dist/forge-*
