@@ -386,8 +386,42 @@ pub const Engine = struct {
         coerce: bool,
     ) error{OutOfMemory}!std.json.Value {
         if (value != .array) return value;
-        if (schema.items == null) return value;
         const a = self.arena;
+        const len = value.array.items.len;
+        const field = fieldFromPath(path);
+
+        if (schema.min_items) |min| {
+            if (len < min) {
+                result.valid = false;
+                try result.errors.append(a, .{
+                    .field = field, .path = path,
+                    .expected = try std.fmt.allocPrint(a, "length >= {d}", .{min}),
+                    .received_type = "array",
+                    .received_value = try std.fmt.allocPrint(a, "(length {d})", .{len}),
+                    .coercible = false, .coerced_to = null,
+                    .message = try std.fmt.allocPrint(a,
+                        "array '{s}' has {d} item(s), expected at least {d} (minItems)",
+                        .{ field, len, min }),
+                });
+            }
+        }
+        if (schema.max_items) |max| {
+            if (len > max) {
+                result.valid = false;
+                try result.errors.append(a, .{
+                    .field = field, .path = path,
+                    .expected = try std.fmt.allocPrint(a, "length <= {d}", .{max}),
+                    .received_type = "array",
+                    .received_value = try std.fmt.allocPrint(a, "(length {d})", .{len}),
+                    .coercible = false, .coerced_to = null,
+                    .message = try std.fmt.allocPrint(a,
+                        "array '{s}' has {d} item(s), expected at most {d} (maxItems)",
+                        .{ field, len, max }),
+                });
+            }
+        }
+
+        if (schema.items == null) return value;
 
         var out_arr = std.json.Array.init(a);
         for (value.array.items, 0..) |item, i| {

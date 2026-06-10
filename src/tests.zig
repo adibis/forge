@@ -515,6 +515,70 @@ test "not: invalid when subschema passes" {
     try std.testing.expect(!vr.valid);
 }
 
+// ---- minItems / maxItems tests ----
+
+test "minItems: accepts array at exact minimum" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    var vr = try parseAndValidateKeywords(arena.allocator(),
+        \\{"type":"array","minItems":2}
+    , "[1,2]", false);
+    defer vr.deinit();
+    try std.testing.expect(vr.valid);
+}
+
+test "minItems: rejects array below minimum" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    var vr = try parseAndValidateKeywords(arena.allocator(),
+        \\{"type":"array","minItems":3}
+    , "[1,2]", false);
+    defer vr.deinit();
+    try std.testing.expect(!vr.valid);
+    try std.testing.expectEqual(@as(usize, 1), vr.errors.items.len);
+}
+
+test "maxItems: accepts array at exact maximum" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    var vr = try parseAndValidateKeywords(arena.allocator(),
+        \\{"type":"array","maxItems":3}
+    , "[1,2,3]", false);
+    defer vr.deinit();
+    try std.testing.expect(vr.valid);
+}
+
+test "maxItems: rejects array above maximum" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    var vr = try parseAndValidateKeywords(arena.allocator(),
+        \\{"type":"array","maxItems":2}
+    , "[1,2,3]", false);
+    defer vr.deinit();
+    try std.testing.expect(!vr.valid);
+    try std.testing.expectEqual(@as(usize, 1), vr.errors.items.len);
+}
+
+test "minItems and maxItems: both enforced together" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    var vr = try parseAndValidateKeywords(arena.allocator(),
+        \\{"type":"array","minItems":2,"maxItems":4}
+    , "[1]", false);
+    defer vr.deinit();
+    try std.testing.expect(!vr.valid);
+}
+
+test "minItems: works without items schema" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    var vr = try parseAndValidateKeywords(arena.allocator(),
+        \\{"type":"array","minItems":1}
+    , "[]", false);
+    defer vr.deinit();
+    try std.testing.expect(!vr.valid);
+}
+
 // ---- generators/jsonschema tests ----
 
 test "jsonschema: round-trip preserves type and required" {

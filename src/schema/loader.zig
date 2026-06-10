@@ -140,6 +140,12 @@ pub fn loadSchema(root: *ir.SchemaRoot, val: std.json.Value) LoadError!ir.Schema
         child.* = try loadSchema(root, v);
         schema.items = child;
     }
+    if (obj.get("minItems")) |v| {
+        if (jsonToUsize(v)) |n| schema.min_items = n;
+    }
+    if (obj.get("maxItems")) |v| {
+        if (jsonToUsize(v)) |n| schema.max_items = n;
+    }
 
     if (obj.get("minLength")) |v| {
         if (jsonToUsize(v)) |n| schema.min_length = n;

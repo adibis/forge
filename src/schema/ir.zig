@@ -112,8 +112,10 @@ pub const Schema = struct {
     properties: []Property = &.{},
     required: []const []const u8 = &.{},
 
-    // array element schema
+    // array element schema and size constraints
     items: ?*Schema = null,
+    min_items: ?usize = null,
+    max_items: ?usize = null,
 
     // string constraints
     format: Format = .none,
