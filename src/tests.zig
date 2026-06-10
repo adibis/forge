@@ -140,6 +140,38 @@ test "engine: array items validated" {
     try std.testing.expect(vr.valid);
 }
 
+// This test documents the retry loop termination bug.
+//
+// After coerce=true validation, `vr.valid` is false whenever any error was
+// recorded — even if every error was coercible and best_effort is fully valid.
+// The retry loop previously checked `if (vr.valid)` to decide success, so it
+// would call the provider again instead of returning the already-fixed result.
+//
+// The correct check is: no hard errors (errors where coercible==false).
+// This test verifies the pre-condition so the loop can be tested without IO.
+test "retry termination: coercible-only errors have no hard errors" {
+    var arena = engineArena();
+    defer arena.deinit();
+    const a = arena.allocator();
+    // Input has two coercible problems: numeric string + enum case fold
+    var vr = try parseAndValidate(a,
+        \\{"type":"object","properties":{"age":{"type":"integer"},"status":{"type":"string","enum":["active","inactive"]}},"required":["age","status"]}
+    , "{\"age\":\"30\",\"status\":\"ACTIVE\"}", true);
+    defer vr.deinit();
+
+    // vr.valid is false — this is why the old retry loop kept looping
+    try std.testing.expect(!vr.valid);
+    // but best_effort IS present and is the corrected value
+    try std.testing.expect(vr.best_effort != null);
+    // and every error is coercible — so the loop SHOULD have terminated
+    for (vr.errors.items) |e| {
+        try std.testing.expect(e.coercible);
+    }
+    // verify the coerced values are correct
+    try std.testing.expectEqual(@as(i64, 30), vr.best_effort.?.object.get("age").?.integer);
+    try std.testing.expectEqualStrings("active", vr.best_effort.?.object.get("status").?.string);
+}
+
 test "engine: float coerced to integer when lossless" {
     var arena = engineArena();
     defer arena.deinit();
@@ -149,6 +181,74 @@ test "engine: float coerced to integer when lossless" {
     , "{\"n\":3.0}", true);
     defer vr.deinit();
     try std.testing.expectEqual(@as(i64, 3), vr.best_effort.?.object.get("n").?.integer);
+}
+
+// ---- errors/report tests ----
+
+test "report: valid result has status ok and no retry prompt" {
+    var arena = engineArena();
+    defer arena.deinit();
+    const a = arena.allocator();
+    var vr = try parseAndValidate(a,
+        \\{"type":"object","properties":{"x":{"type":"integer"}},"required":["x"]}
+    , "{\"x\":1}", false);
+    defer vr.deinit();
+    const resp = try report_mod.buildResponse(a, &vr, true, true);
+    try std.testing.expectEqualStrings("ok", resp.status);
+    try std.testing.expect(resp.retry_prompt == null);
+    try std.testing.expectEqual(@as(usize, 0), resp.errors.len);
+}
+
+test "report: invalid result has status error and retry prompt" {
+    var arena = engineArena();
+    defer arena.deinit();
+    const a = arena.allocator();
+    var vr = try parseAndValidate(a,
+        \\{"type":"object","properties":{"x":{"type":"integer"}},"required":["x"]}
+    , "{}", false);
+    defer vr.deinit();
+    const resp = try report_mod.buildResponse(a, &vr, true, true);
+    try std.testing.expectEqualStrings("error", resp.status);
+    try std.testing.expect(resp.retry_prompt != null);
+    try std.testing.expect(resp.errors.len > 0);
+}
+
+test "report: retry prompt mentions the failing field" {
+    var arena = engineArena();
+    defer arena.deinit();
+    const a = arena.allocator();
+    var vr = try parseAndValidate(a,
+        \\{"type":"object","properties":{"email":{"type":"string"}},"required":["email"]}
+    , "{}", false);
+    defer vr.deinit();
+    const prompt = try report_mod.buildRetryPrompt(a, &vr);
+    try std.testing.expect(std.mem.containsAtLeast(u8, prompt, 1, "email"));
+    try std.testing.expect(std.mem.containsAtLeast(u8, prompt, 1, "corrected JSON"));
+}
+
+test "report: no retry prompt when include_retry_prompt is false" {
+    var arena = engineArena();
+    defer arena.deinit();
+    const a = arena.allocator();
+    var vr = try parseAndValidate(a,
+        \\{"type":"object","properties":{"x":{"type":"string"}},"required":["x"]}
+    , "{}", false);
+    defer vr.deinit();
+    const resp = try report_mod.buildResponse(a, &vr, true, false);
+    try std.testing.expect(resp.retry_prompt == null);
+}
+
+test "report: coercions reflected in response" {
+    var arena = engineArena();
+    defer arena.deinit();
+    const a = arena.allocator();
+    var vr = try parseAndValidate(a,
+        \\{"type":"object","properties":{"n":{"type":"integer"}},"required":["n"]}
+    , "{\"n\":\"42\"}", true);
+    defer vr.deinit();
+    const resp = try report_mod.buildResponse(a, &vr, true, true);
+    try std.testing.expectEqual(@as(usize, 1), resp.coercions.len);
+    try std.testing.expectEqualStrings("$.n", resp.coercions[0].path);
 }
 
 // ---- generate/pydantic tests ----
