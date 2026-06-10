@@ -34,10 +34,20 @@ pub fn main(init: std.process.Init) !void {
         if (v == .string) v.string else ""
     else "";
 
+    const attempt_num = if (parsed.value.object.get("attempt_number")) |v|
+        if (v == .integer) v.integer else 1
+    else @as(i64, 1);
+
+    const verbose = env.get("FORGE_VERBOSE") != null;
+
     const full_prompt = try std.fmt.allocPrint(a,
         "You are a JSON API. Return ONLY valid JSON — no explanation, no markdown.\n\nSchema:\n{s}\n\n{s}",
         .{ schema_json, prompt_val.string },
     );
+
+    if (verbose) {
+        std.debug.print("\n[forge-provider-ollama] attempt {d}\n>>> PROMPT >>>\n{s}\n<<<\n", .{ attempt_num, full_prompt });
+    }
 
     const host = env.get("OLLAMA_HOST") orelse DEFAULT_HOST;
     const model = env.get("OLLAMA_MODEL") orelse { writeError(gpa, io, "OLLAMA_MODEL not set"); std.process.exit(1); };
@@ -73,6 +83,10 @@ pub fn main(init: std.process.Init) !void {
 
     const resp_text = resp_parsed.value.object.get("response") orelse { writeError(gpa, io, "missing 'response'"); std.process.exit(1); };
     if (resp_text != .string) { writeError(gpa, io, "'response' is not string"); std.process.exit(1); }
+
+    if (verbose) {
+        std.debug.print("<<< RESPONSE <<<\n{s}\n>>>\n", .{resp_text.string});
+    }
 
     const out = try std.fmt.allocPrint(gpa, "{{\"response\":\"{s}\"}}\n", .{try jsonEscape(a, resp_text.string)});
     defer gpa.free(out);

@@ -10,6 +10,7 @@ pub const RetryOptions = struct {
     provider: []const u8,
     max_retries: u32 = 3,
     schema_json: []const u8,
+    verbose: bool = false,
 };
 
 pub const RetryResult = struct {
@@ -37,12 +38,15 @@ pub fn run(
     var attempt: u32 = 0;
 
     while (attempt <= opts.max_retries) : (attempt += 1) {
-        // Parse into the arena so string slices in vr.best_effort stay valid
-        // after this iteration ends (gpa-backed ParseResult would be freed by defer
-        // before the caller could use the returned value).
+        if (opts.verbose) {
+            std.debug.print("\n[forge retry] attempt {d}: validating input ({d} bytes)\n", .{ attempt, current_input.len });
+        }
+
         var parse_result = json_parse.parseLenient(a, current_input) catch |e| {
+            if (opts.verbose) {
+                std.debug.print("[forge retry] attempt {d}: parse failed ({s}), calling provider\n", .{ attempt, @errorName(e) });
+            }
             if (attempt == opts.max_retries) return e;
-            // Build a prompt asking for valid JSON
             const prompt = try std.fmt.allocPrint(a,
                 "The JSON you returned could not be parsed: {s}. Please return only valid JSON.",
                 .{@errorName(e)});
@@ -51,20 +55,29 @@ pub fn run(
         };
         defer parse_result.deinit();
 
-        // Validate
         var eng = engine_mod.Engine.init(a, schema_root);
         var vr = try eng.validate(parse_result.value, true);
         defer vr.deinit();
 
-        // Accept if there are no hard (uncoercible) errors — mirrors fix subcommand logic.
-        // vr.valid is false whenever any error was recorded, including coercible ones,
-        // so checking vr.valid alone would cause unnecessary retries.
         const has_hard_error = blk: {
             for (vr.errors.items) |e| {
                 if (!e.coercible) break :blk true;
             }
             break :blk false;
         };
+
+        if (opts.verbose) {
+            if (vr.errors.items.len == 0) {
+                std.debug.print("[forge retry] attempt {d}: valid — done\n", .{attempt});
+            } else {
+                std.debug.print("[forge retry] attempt {d}: {d} error(s) ({s})\n", .{
+                    attempt,
+                    vr.errors.items.len,
+                    if (has_hard_error) "hard errors, will call provider" else "coercible only, accepting",
+                });
+            }
+        }
+
         if (!has_hard_error) {
             return RetryResult{
                 .value = vr.best_effort.?,
@@ -73,12 +86,10 @@ pub fn run(
             };
         }
 
-        // Last attempt failed
         if (attempt == opts.max_retries) {
             return error.MaxRetriesExceeded;
         }
 
-        // Build retry prompt and call plugin
         const resp = try report.buildResponse(a, &vr, true, true);
         const retry_prompt = resp.retry_prompt orelse "Please return valid JSON.";
 

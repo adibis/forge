@@ -37,10 +37,20 @@ pub fn main(init: std.process.Init) !void {
         if (v == .string) v.string else ""
     else "";
 
+    const attempt_num = if (parsed.value.object.get("attempt_number")) |v|
+        if (v == .integer) v.integer else 1
+    else @as(i64, 1);
+
+    const verbose = env.get("FORGE_VERBOSE") != null;
+
     const full_prompt = try std.fmt.allocPrint(a,
         "You are a JSON API. Return ONLY valid JSON — no explanation, no markdown.\n\nSchema:\n{s}\n\n{s}",
         .{ schema_json, prompt_val.string },
     );
+
+    if (verbose) {
+        std.debug.print("\n[forge-provider-anthropic] attempt {d}\n>>> PROMPT >>>\n{s}\n<<<\n", .{ attempt_num, full_prompt });
+    }
 
     const api_key = env.get("ANTHROPIC_API_KEY") orelse {
         writeError(gpa, io, "ANTHROPIC_API_KEY not set"); std.process.exit(1);
@@ -94,6 +104,10 @@ pub fn main(init: std.process.Init) !void {
     if (first != .object) { writeError(gpa, io, "invalid content[0]"); std.process.exit(1); }
     const text_val = first.object.get("text") orelse { writeError(gpa, io, "missing 'text'"); std.process.exit(1); };
     if (text_val != .string) { writeError(gpa, io, "text is not string"); std.process.exit(1); }
+
+    if (verbose) {
+        std.debug.print("<<< RESPONSE <<<\n{s}\n>>>\n", .{text_val.string});
+    }
 
     const escaped = try jsonEscape(a, text_val.string);
     const out = try std.fmt.allocPrint(gpa, "{{\"response\":\"{s}\"}}\n", .{escaped});

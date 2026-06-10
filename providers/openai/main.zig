@@ -35,10 +35,20 @@ pub fn main(init: std.process.Init) !void {
         if (v == .string) v.string else ""
     else "";
 
+    const attempt_num = if (parsed.value.object.get("attempt_number")) |v|
+        if (v == .integer) v.integer else 1
+    else @as(i64, 1);
+
+    const verbose = env.get("FORGE_VERBOSE") != null;
+
     const full_prompt = try std.fmt.allocPrint(a,
         "You are a JSON API. Return ONLY valid JSON — no explanation, no markdown.\n\nSchema:\n{s}\n\n{s}",
         .{ schema_json, prompt_val.string },
     );
+
+    if (verbose) {
+        std.debug.print("\n[forge-provider-openai] attempt {d}\n>>> PROMPT >>>\n{s}\n<<<\n", .{ attempt_num, full_prompt });
+    }
 
     const api_key = env.get("OPENAI_API_KEY") orelse { writeError(gpa, io, "OPENAI_API_KEY not set"); std.process.exit(1); };
     const model = env.get("OPENAI_MODEL") orelse DEFAULT_MODEL;
@@ -89,6 +99,10 @@ pub fn main(init: std.process.Init) !void {
     if (message != .object) { writeError(gpa, io, "invalid message"); std.process.exit(1); }
     const content_val = message.object.get("content") orelse { writeError(gpa, io, "missing 'content'"); std.process.exit(1); };
     if (content_val != .string) { writeError(gpa, io, "content not string"); std.process.exit(1); }
+
+    if (verbose) {
+        std.debug.print("<<< RESPONSE <<<\n{s}\n>>>\n", .{content_val.string});
+    }
 
     const out = try std.fmt.allocPrint(gpa, "{{\"response\":\"{s}\"}}\n", .{try jsonEscape(a, content_val.string)});
     defer gpa.free(out);
