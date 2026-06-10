@@ -15,10 +15,10 @@ const usage =
     \\forge — LLM output validator and repair tool
     \\
     \\Usage:
-    \\  forge validate  --schema <file> [--input <file>]
-    \\  forge fix       --schema <file> [--input <file>]
-    \\  forge retry     --schema <file> --provider <name> [--max-retries N] [--input <file>]
-    \\  forge generate  --schema <file> --target <lang>
+    \\  forge validate  --schema <file> [--input <file>] [--output <file>]
+    \\  forge fix       --schema <file> [--input <file>] [--output <file>]
+    \\  forge retry     --schema <file> --provider <name> [--max-retries N] [--input <file>] [--output <file>]
+    \\  forge generate  --schema <file> --target <lang> [--output <file>]
     \\
     \\Subcommands:
     \\  validate   Validate JSON; exit 0=ok, 1=invalid, 2=schema error, 3=parse error
@@ -29,6 +29,7 @@ const usage =
     \\Options:
     \\  --schema <file>    JSON Schema file (required)
     \\  --input <file>     Input JSON file (default: stdin)
+    \\  --output <file>    Write output to file instead of stdout
     \\  --provider <name>  Provider name for retry (e.g. openai, anthropic, ollama)
     \\  --max-retries N    Max retry attempts (default: 3)
     \\  --target <lang>    Code generation target
@@ -80,7 +81,8 @@ fn runValidateOrFix(
 ) !void {
     var schema_path: ?[]const u8 = null;
     var input_path: ?[]const u8 = null;
-    parseSchemaInput(args, &schema_path, &input_path);
+    var output_path: ?[]const u8 = null;
+    parseCommonArgs(args, &schema_path, &input_path, &output_path);
 
     const sp = schema_path orelse exitWithError(gpa, io, 2, "schema-load-error", "missing --schema");
     const schema_text = readFile(gpa, io, sp, 2);
@@ -94,12 +96,15 @@ fn runValidateOrFix(
     const input_text = readInput(gpa, io, input_path, 3);
     defer gpa.free(input_text);
 
+    const out_file = openOutputFile(gpa, io, output_path);
+    defer if (out_file) |f| f.close(io);
+
     var parse_result = json_parse.parseLenient(gpa, input_text) catch |e| {
         const trunc = e == error.TruncatedJson;
         if (trunc) {
-            emit(gpa, io, "{\"status\":\"error\",\"input_parseable\":false,\"truncated\":true,\"errors\":[],\"warnings\":[],\"coercions\":[]}\n");
+            emit(io, out_file, "{\"status\":\"error\",\"input_parseable\":false,\"truncated\":true,\"errors\":[],\"warnings\":[],\"coercions\":[]}\n");
         } else {
-            emit(gpa, io, "{\"status\":\"error\",\"input_parseable\":false,\"errors\":[],\"warnings\":[],\"coercions\":[]}\n");
+            emit(io, out_file, "{\"status\":\"error\",\"input_parseable\":false,\"errors\":[],\"warnings\":[],\"coercions\":[]}\n");
         }
         std.process.exit(3);
     };
@@ -114,8 +119,7 @@ fn runValidateOrFix(
     defer vr.deinit();
 
     if (do_fix) {
-        // fix: emit only the repaired JSON; exit 1 only if uncoercible (hard) errors remain
-        emitJson(gpa, io, vr.best_effort orelse parse_result.value);
+        emitJson(gpa, io, out_file, vr.best_effort orelse parse_result.value);
         const has_hard_error = blk: {
             for (vr.errors.items) |e| {
                 if (!e.coercible) break :blk true;
@@ -125,7 +129,7 @@ fn runValidateOrFix(
         if (has_hard_error) std.process.exit(1);
     } else {
         const resp = try report.buildResponse(a, &vr, true, true);
-        emitJson(gpa, io, resp);
+        emitJson(gpa, io, out_file, resp);
         if (!vr.valid) std.process.exit(1);
     }
 }
@@ -135,6 +139,7 @@ fn runValidateOrFix(
 fn runRetry(gpa: std.mem.Allocator, io: Io, args: []const [:0]const u8, env: *const std.process.Environ.Map) !void {
     var schema_path: ?[]const u8 = null;
     var input_path: ?[]const u8 = null;
+    var output_path: ?[]const u8 = null;
     var provider: ?[]const u8 = null;
     var max_retries: u32 = 3;
 
@@ -144,6 +149,8 @@ fn runRetry(gpa: std.mem.Allocator, io: Io, args: []const [:0]const u8, env: *co
             i += 1; schema_path = args[i];
         } else if (std.mem.eql(u8, args[i], "--input") and i + 1 < args.len) {
             i += 1; input_path = args[i];
+        } else if (std.mem.eql(u8, args[i], "--output") and i + 1 < args.len) {
+            i += 1; output_path = args[i];
         } else if (std.mem.eql(u8, args[i], "--provider") and i + 1 < args.len) {
             i += 1; provider = args[i];
         } else if (std.mem.eql(u8, args[i], "--max-retries") and i + 1 < args.len) {
@@ -177,21 +184,25 @@ fn runRetry(gpa: std.mem.Allocator, io: Io, args: []const [:0]const u8, env: *co
     };
     defer result.deinit();
 
+    const out_file = openOutputFile(gpa, io, output_path);
+    defer if (out_file) |f| f.close(io);
+
     const out_json = std.json.Stringify.valueAlloc(gpa, result.value, .{}) catch return;
     defer gpa.free(out_json);
 
     var resp_buf: [128]u8 = undefined;
     const wrapper = std.fmt.bufPrint(&resp_buf,
         "{{\"status\":\"ok\",\"attempts\":{d},\"data\":", .{result.attempts}) catch return;
-    emit(gpa, io, wrapper);
-    emit(gpa, io, out_json);
-    emit(gpa, io, "}\n");
+    emit(io, out_file, wrapper);
+    emit(io, out_file, out_json);
+    emit(io, out_file, "}\n");
 }
 
 // --- generate ---
 
 fn runGenerate(gpa: std.mem.Allocator, io: Io, args: []const [:0]const u8) !void {
     var schema_path: ?[]const u8 = null;
+    var output_path: ?[]const u8 = null;
     var target: ?[]const u8 = null;
     var model_name: []const u8 = "Model";
 
@@ -199,6 +210,8 @@ fn runGenerate(gpa: std.mem.Allocator, io: Io, args: []const [:0]const u8) !void
     while (i < args.len) : (i += 1) {
         if (std.mem.eql(u8, args[i], "--schema") and i + 1 < args.len) {
             i += 1; schema_path = args[i];
+        } else if (std.mem.eql(u8, args[i], "--output") and i + 1 < args.len) {
+            i += 1; output_path = args[i];
         } else if (std.mem.eql(u8, args[i], "--target") and i + 1 < args.len) {
             i += 1; target = args[i];
         } else if (std.mem.eql(u8, args[i], "--model-name") and i + 1 < args.len) {
@@ -235,15 +248,19 @@ fn runGenerate(gpa: std.mem.Allocator, io: Io, args: []const [:0]const u8) !void
 
     const generated = try aw.toOwnedSlice();
     defer gpa.free(generated);
-    try Io.File.stdout().writeStreamingAll(io, generated);
+
+    const out_file = openOutputFile(gpa, io, output_path);
+    defer if (out_file) |f| f.close(io);
+    emit(io, out_file, generated);
 }
 
 // --- helpers ---
 
-fn parseSchemaInput(
+fn parseCommonArgs(
     args: []const [:0]const u8,
     schema_path: *?[]const u8,
     input_path: *?[]const u8,
+    output_path: *?[]const u8,
 ) void {
     var i: usize = 0;
     while (i < args.len) : (i += 1) {
@@ -251,6 +268,8 @@ fn parseSchemaInput(
             i += 1; schema_path.* = args[i];
         } else if (std.mem.eql(u8, args[i], "--input") and i + 1 < args.len) {
             i += 1; input_path.* = args[i];
+        } else if (std.mem.eql(u8, args[i], "--output") and i + 1 < args.len) {
+            i += 1; output_path.* = args[i];
         }
     }
 }
@@ -270,16 +289,23 @@ fn readInput(gpa: std.mem.Allocator, io: Io, path: ?[]const u8, exit_code: u8) [
     };
 }
 
-fn emit(gpa: std.mem.Allocator, io: Io, s: []const u8) void {
-    _ = gpa;
-    Io.File.stdout().writeStreamingAll(io, s) catch {};
+fn openOutputFile(gpa: std.mem.Allocator, io: Io, path: ?[]const u8) ?Io.File {
+    const p = path orelse return null;
+    return Io.Dir.cwd().createFile(io, p, .{}) catch |e| {
+        exitWithErrorFmt(gpa, io, 1, "output-error", "cannot open output file '{s}': {s}", .{ p, @errorName(e) });
+    };
 }
 
-fn emitJson(gpa: std.mem.Allocator, io: Io, value: anytype) void {
+fn emit(io: Io, out: ?Io.File, s: []const u8) void {
+    const f = out orelse Io.File.stdout();
+    f.writeStreamingAll(io, s) catch {};
+}
+
+fn emitJson(gpa: std.mem.Allocator, io: Io, out: ?Io.File, value: anytype) void {
     const s = std.json.Stringify.valueAlloc(gpa, value, .{}) catch return;
     defer gpa.free(s);
-    emit(gpa, io, s);
-    emit(gpa, io, "\n");
+    emit(io, out, s);
+    emit(io, out, "\n");
 }
 
 fn exitWithError(gpa: std.mem.Allocator, io: Io, code: u8, err_code: []const u8, msg: []const u8) noreturn {
