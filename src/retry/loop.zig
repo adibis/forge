@@ -37,8 +37,10 @@ pub fn run(
     var attempt: u32 = 0;
 
     while (attempt <= opts.max_retries) : (attempt += 1) {
-        // Parse current input
-        var parse_result = json_parse.parseLenient(gpa, current_input) catch |e| {
+        // Parse into the arena so string slices in vr.best_effort stay valid
+        // after this iteration ends (gpa-backed ParseResult would be freed by defer
+        // before the caller could use the returned value).
+        var parse_result = json_parse.parseLenient(a, current_input) catch |e| {
             if (attempt == opts.max_retries) return e;
             // Build a prompt asking for valid JSON
             const prompt = try std.fmt.allocPrint(a,
@@ -54,7 +56,16 @@ pub fn run(
         var vr = try eng.validate(parse_result.value, true);
         defer vr.deinit();
 
-        if (vr.valid) {
+        // Accept if there are no hard (uncoercible) errors — mirrors fix subcommand logic.
+        // vr.valid is false whenever any error was recorded, including coercible ones,
+        // so checking vr.valid alone would cause unnecessary retries.
+        const has_hard_error = blk: {
+            for (vr.errors.items) |e| {
+                if (!e.coercible) break :blk true;
+            }
+            break :blk false;
+        };
+        if (!has_hard_error) {
             return RetryResult{
                 .value = vr.best_effort.?,
                 .attempts = attempt + 1,
