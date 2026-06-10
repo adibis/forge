@@ -238,6 +238,39 @@ test "typescript: enum field produces z.enum" {
     try std.testing.expect(std.mem.containsAtLeast(u8, out, 1, "\"admin\""));
 }
 
+// ---- generate/zig_struct tests ----
+
+test "zig: struct has correct field types" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    var root = try loader.loadFromSlice(a,
+        \\{"type":"object","properties":{"name":{"type":"string"},"count":{"type":"integer"}},"required":["name","count"]}
+    );
+    var aw: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    try gen_zig.generate(&root, "Item", &aw.writer, std.testing.allocator);
+    const out = try aw.toOwnedSlice();
+    defer std.testing.allocator.free(out);
+    try std.testing.expect(std.mem.containsAtLeast(u8, out, 1, "pub const Item = struct {"));
+    try std.testing.expect(std.mem.containsAtLeast(u8, out, 1, "name: []const u8"));
+    try std.testing.expect(std.mem.containsAtLeast(u8, out, 1, "count: i64"));
+}
+
+test "zig: string enum generates enum type" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    var root = try loader.loadFromSlice(a,
+        \\{"type":"string","enum":["red","green","blue"]}
+    );
+    var aw: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    try gen_zig.generate(&root, "Color", &aw.writer, std.testing.allocator);
+    const out = try aw.toOwnedSlice();
+    defer std.testing.allocator.free(out);
+    try std.testing.expect(std.mem.containsAtLeast(u8, out, 1, "pub const Color = enum {"));
+    try std.testing.expect(std.mem.containsAtLeast(u8, out, 1, "red,"));
+}
+
 // ---- generate/jsonschema tests ----
 
 test "jsonschema: round-trip preserves type and required" {
