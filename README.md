@@ -277,21 +277,20 @@ unavailable.
 API. It works on any edge node with outbound connectivity. If you are running
 Ollama locally on the device, the full retry pipeline works there too.
 
-**Microcontrollers (ESP32 and similar)**
+**Tiny LLMs and the JSON validation problem**
 
-People have run tiny models (100K–1M parameter, heavily quantized) directly on
-ESP32-S3 boards. The output validation problem is real in that context: a model
-that small will produce well-structured JSON sometimes and near-miss JSON other
-times. The `validate` and `fix` logic in forge — lenient parsing, type coercion,
-enum case-folding — is exactly what you need between the model and your
-application.
+Small language models running on edge devices produce structured JSON outputs
+that drive real actions — controlling home automation, issuing robot commands,
+generating sensor alerts, feeding industrial pipelines. When that JSON is
+malformed or schema-invalid, the failure is often silent: a broken automation,
+a dropped command, a blocked alert.
 
-The forge binary itself requires a POSIX environment and won't run on FreeRTOS.
-However the core algorithms (`parse/`, `validate/`, `schema/`) are pure Zig with
-allocator interfaces and no OS dependencies. Zig supports the RISC-V variants of
-ESP32 (C3, C6) natively, and Xtensa (ESP32, S3) via Espressif's Zig fork. A
-`libforge` build target that exposes the core as a linkable library — usable from
-ESP-IDF applications — is a planned milestone (see below).
+The forge binary requires a POSIX environment. However the core algorithms
+(`parse/`, `validate/`, `schema/`) are pure Zig with allocator interfaces and
+no OS dependencies. A `libforge` build target — a static library with a
+C-compatible API, no CLI, no subprocess — can be linked directly into any
+application running on the device. This is an active development goal (see
+below).
 
 ---
 
@@ -304,23 +303,26 @@ These are the planned directions for forge, in rough priority order.
 - YAML schema input (`--schema model.yaml`)
 - `--output <file>` flag on all subcommands
 - Streaming input support (validate as tokens arrive)
-
-**Medium term**
-
-- `libforge`: a static library build target exposing the core validate/fix/parse
-  logic as a C-compatible API. No CLI, no provider subprocess — just the
-  algorithms. Primary use case: linking into applications that cannot run a
-  subprocess, including ESP-IDF firmware, Go/Rust/C services, and WASM runtimes.
-
 - Additional JSON Schema keywords: `allOf`, `anyOf`, `oneOf`, `not`,
   `minLength`/`maxLength`, `pattern`, `additionalProperties`
 
+**Medium term — libforge**
+
+`libforge` is a static library build target that exposes the core
+validate/fix/parse logic as a C-compatible API. No CLI layer, no provider
+subprocess, no OS dependencies — just the algorithms, linkable into any
+application.
+
+Target environments:
+- Edge devices running tiny local models
+- Go, Rust, and C services that want validation without shelling out
+- WASM runtimes (Cloudflare Workers, Deno Deploy, browser)
+
 **Longer term**
 
-- WASM build target for browser and edge-runtime use (Cloudflare Workers,
-  Deno Deploy)
-- ESP32 reference implementation: a working example of `libforge` embedded in an
-  ESP-IDF project running a tiny local model
+- WASM build target
+- Additional provider plugins (Gemini, Mistral, local llama.cpp server)
+- Schema inference: generate a JSON Schema from example outputs
 
 ---
 
