@@ -52,7 +52,7 @@ pub fn run(
             const prompt = try std.fmt.allocPrint(a,
                 "The JSON you returned could not be parsed: {s}. Please return only valid JSON.",
                 .{@errorName(e)});
-            current_input = try callProviderForRetry(gpa, io, a, opts, prompt, attempt + 1);
+            current_input = try callProviderForRetry(gpa, io, a, opts, prompt, &.{}, attempt + 1);
             continue;
         };
         defer parse_result.deinit();
@@ -95,7 +95,11 @@ pub fn run(
         const resp = try report.buildResponse(a, &vr, true, true);
         const retry_prompt = resp.retry_prompt orelse "Please return valid JSON.";
 
-        current_input = try callProviderForRetry(gpa, io, a, opts, retry_prompt, attempt + 1);
+        var err_msgs = std.ArrayList([]const u8).init(a);
+        for (vr.errors.items) |e| try err_msgs.append(e.message);
+        const prev_errors = try err_msgs.toOwnedSlice();
+
+        current_input = try callProviderForRetry(gpa, io, a, opts, retry_prompt, prev_errors, attempt + 1);
     }
 
     return error.MaxRetriesExceeded;
@@ -107,12 +111,13 @@ fn callProviderForRetry(
     arena: std.mem.Allocator,
     opts: RetryOptions,
     prompt: []const u8,
+    previous_errors: []const []const u8,
     attempt: u32,
 ) ![]const u8 {
     const req = plugin.PluginRequest{
         .prompt = prompt,
         .schema_json = opts.schema_json,
-        .previous_errors = &.{},
+        .previous_errors = previous_errors,
         .attempt_number = attempt,
     };
     const response = try dispatch.call(gpa, io, opts.provider, req, opts.env);
