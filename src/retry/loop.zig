@@ -92,7 +92,7 @@ pub fn run(
             return error.MaxRetriesExceeded;
         }
 
-        const resp = try report.buildResponse(a, &vr, true, true);
+        const resp = try report.buildResponse(a, &vr, true, current_input);
         const retry_prompt = resp.retry_prompt orelse "Please return valid JSON.";
 
         var err_msgs = std.ArrayList([]const u8).init(a);

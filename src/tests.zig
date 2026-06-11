@@ -193,7 +193,7 @@ test "report: valid result has status ok and no retry prompt" {
         \\{"type":"object","properties":{"x":{"type":"integer"}},"required":["x"]}
     , "{\"x\":1}", false);
     defer vr.deinit();
-    const resp = try report_mod.buildResponse(a, &vr, true, true);
+    const resp = try report_mod.buildResponse(a, &vr, true, null);
     try std.testing.expectEqualStrings("ok", resp.status);
     try std.testing.expect(resp.retry_prompt == null);
     try std.testing.expectEqual(@as(usize, 0), resp.errors.len);
@@ -207,7 +207,7 @@ test "report: invalid result has status error and retry prompt" {
         \\{"type":"object","properties":{"x":{"type":"integer"}},"required":["x"]}
     , "{}", false);
     defer vr.deinit();
-    const resp = try report_mod.buildResponse(a, &vr, true, true);
+    const resp = try report_mod.buildResponse(a, &vr, true, "{}");
     try std.testing.expectEqualStrings("error", resp.status);
     try std.testing.expect(resp.retry_prompt != null);
     try std.testing.expect(resp.errors.len > 0);
@@ -221,7 +221,7 @@ test "report: retry prompt mentions the failing field" {
         \\{"type":"object","properties":{"email":{"type":"string"}},"required":["email"]}
     , "{}", false);
     defer vr.deinit();
-    const prompt = try report_mod.buildRetryPrompt(a, &vr);
+    const prompt = try report_mod.buildRetryPrompt(a, &vr, "{}");
     try std.testing.expect(std.mem.containsAtLeast(u8, prompt, 1, "email"));
     try std.testing.expect(std.mem.containsAtLeast(u8, prompt, 1, "corrected JSON"));
 }
@@ -234,7 +234,7 @@ test "report: no retry prompt when include_retry_prompt is false" {
         \\{"type":"object","properties":{"x":{"type":"string"}},"required":["x"]}
     , "{}", false);
     defer vr.deinit();
-    const resp = try report_mod.buildResponse(a, &vr, true, false);
+    const resp = try report_mod.buildResponse(a, &vr, true, null);
     try std.testing.expect(resp.retry_prompt == null);
 }
 
@@ -246,7 +246,7 @@ test "report: coercions reflected in response" {
         \\{"type":"object","properties":{"n":{"type":"integer"}},"required":["n"]}
     , "{\"n\":\"42\"}", true);
     defer vr.deinit();
-    const resp = try report_mod.buildResponse(a, &vr, true, true);
+    const resp = try report_mod.buildResponse(a, &vr, true, null);
     try std.testing.expectEqual(@as(usize, 1), resp.coercions.len);
     try std.testing.expectEqualStrings("$.n", resp.coercions[0].path);
 }

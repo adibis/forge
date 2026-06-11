@@ -4,6 +4,7 @@ const engine = @import("../validate/engine.zig");
 pub fn buildRetryPrompt(
     arena: std.mem.Allocator,
     result: *const engine.ValidationResult,
+    previous_json: []const u8,
 ) ![]const u8 {
     var aw: std.Io.Writer.Allocating = .init(arena);
     const w = &aw.writer;
@@ -12,7 +13,9 @@ pub fn buildRetryPrompt(
     for (result.errors.items) |err| {
         try w.print("- Field '{s}' (path: {s}): {s}\n", .{ err.field, err.path, err.message });
     }
-    try w.writeAll("\nPlease return only the corrected JSON with no explanation.");
+    try w.writeAll("\nYour previous response was:\n");
+    try w.writeAll(previous_json);
+    try w.writeAll("\n\nReturn the corrected JSON only, with no explanation or markdown.");
     return aw.toOwnedSlice();
 }
 
@@ -64,10 +67,10 @@ pub fn buildResponse(
     arena: std.mem.Allocator,
     vr: *const engine.ValidationResult,
     input_parseable: bool,
-    include_retry_prompt: bool,
+    previous_json: ?[]const u8,
 ) !Response {
-    const retry: ?[]const u8 = if (include_retry_prompt and !vr.valid)
-        try buildRetryPrompt(arena, vr)
+    const retry: ?[]const u8 = if (previous_json) |pj|
+        if (!vr.valid) try buildRetryPrompt(arena, vr, pj) else null
     else
         null;
 

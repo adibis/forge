@@ -133,7 +133,7 @@ fn runValidateOrFix(
         };
         if (has_hard_error) std.process.exit(1);
     } else {
-        const resp = try report.buildResponse(a, &vr, true, true);
+        const resp = try report.buildResponse(a, &vr, true, null);
         emitJson(gpa, io, out_file, resp);
         if (!vr.valid) std.process.exit(1);
     }
