@@ -71,8 +71,16 @@ pub fn buildResponse(
     else
         null;
 
+    const status = if (vr.valid) "ok" else blk: {
+        var all_coercible = vr.errors.items.len > 0;
+        for (vr.errors.items) |err| {
+            if (!err.coercible) { all_coercible = false; break; }
+        }
+        break :blk if (all_coercible) "coercible" else "error";
+    };
+
     return .{
-        .status = if (vr.valid) "ok" else "error",
+        .status = status,
         .input_parseable = input_parseable,
         .errors = vr.errors.items,
         .warnings = vr.warnings.items,
