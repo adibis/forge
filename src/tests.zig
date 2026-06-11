@@ -667,6 +667,39 @@ test "maxProperties: rejects object above maximum" {
     try std.testing.expectEqual(@as(usize, 1), vr.errors.items.len);
 }
 
+// ---- const keyword tests ----
+
+test "const: accepts exact match" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    var vr = try parseAndValidateKeywords(arena.allocator(),
+        \\{"const":"circle"}
+    , "\"circle\"", false);
+    defer vr.deinit();
+    try std.testing.expect(vr.valid);
+}
+
+test "const: rejects non-matching value" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    var vr = try parseAndValidateKeywords(arena.allocator(),
+        \\{"const":"circle"}
+    , "\"square\"", false);
+    defer vr.deinit();
+    try std.testing.expect(!vr.valid);
+    try std.testing.expectEqual(@as(usize, 1), vr.errors.items.len);
+}
+
+test "const: integer value" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    var vr = try parseAndValidateKeywords(arena.allocator(),
+        \\{"const":42}
+    , "42", false);
+    defer vr.deinit();
+    try std.testing.expect(vr.valid);
+}
+
 // ---- exclusiveMinimum / exclusiveMaximum tests ----
 
 test "exclusiveMinimum: rejects value equal to bound" {

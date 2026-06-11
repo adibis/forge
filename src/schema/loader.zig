@@ -103,6 +103,10 @@ pub fn loadSchema(root: *ir.SchemaRoot, val: std.json.Value) LoadError!ir.Schema
     if (obj.get("exclusiveMinimum")) |v| schema.exclusive_minimum = jsonToF64(v);
     if (obj.get("exclusiveMaximum")) |v| schema.exclusive_maximum = jsonToF64(v);
 
+    if (obj.get("const")) |v| {
+        schema.const_value = jsonToEnumValue(arena, v) catch null;
+    }
+
     if (obj.get("enum")) |v| {
         if (v == .array) {
             var vals: std.ArrayList(ir.EnumValue) = .empty;

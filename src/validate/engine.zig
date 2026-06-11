@@ -121,6 +121,10 @@ pub const Engine = struct {
             return value;
         }
 
+        if (schema.const_value) |cv| {
+            try self.validateConst(value, cv, path, result);
+        }
+
         if (schema.enum_values) |enum_vals| {
             return self.validateEnum(value, enum_vals, path, result, coerce);
         }
@@ -259,6 +263,27 @@ pub const Engine = struct {
                 .{ field, expected.label(), actual }),
         });
         return value;
+    }
+
+    fn validateConst(
+        self: *Engine,
+        value: std.json.Value,
+        cv: ir.EnumValue,
+        path: []const u8,
+        result: *ValidationResult,
+    ) error{OutOfMemory}!void {
+        const a = self.arena;
+        if (jsonToEnumValue(value).eql(cv)) return;
+        result.valid = false;
+        try result.errors.append(a, .{
+            .field = fieldFromPath(path), .path = path,
+            .expected = cv.label(),
+            .received_type = jsonTypeLabel(value),
+            .received_value = try jsonValueRepr(a, value),
+            .coercible = false, .coerced_to = null,
+            .message = try std.fmt.allocPrint(a,
+                "field '{s}' must be {s} (const)", .{ fieldFromPath(path), cv.label() }),
+        });
     }
 
     fn validateEnum(

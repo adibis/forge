@@ -131,6 +131,8 @@ pub const Schema = struct {
 
     // enum (null means no enum constraint)
     enum_values: ?[]const EnumValue = null,
+    // const — value must equal exactly this (null means no constraint)
+    const_value: ?EnumValue = null,
 
     // schema combiners
     all_of: []const *Schema = &.{},
