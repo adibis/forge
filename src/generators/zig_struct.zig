@@ -48,29 +48,31 @@ const Ctx = struct {
         try w.print("pub const {s} = struct {{\n", .{name});
         for (schema.properties) |prop| {
             const is_req = schema.isRequired(prop.name);
-            const type_str = self.schemaToZigType(prop.schema, is_req);
-            if (is_req) {
-                try w.print("    {s}: {s},\n", .{ prop.name, type_str });
+            const type_str = self.schemaToZigType(prop.schema);
+            const nullable = !is_req or prop.schema.nullable;
+            if (nullable) {
+                try w.print("    {s}: ?{s}", .{ prop.name, type_str });
+                if (!is_req) try w.writeAll(" = null");
+                try w.writeByte('\n');
             } else {
-                try w.print("    {s}: {s} = null,\n", .{ prop.name, type_str });
+                try w.print("    {s}: {s},\n", .{ prop.name, type_str });
             }
         }
         try w.writeAll("};\n");
     }
 
-    fn schemaToZigType(self: *Ctx, schema_in: *const ir.Schema, required: bool) []const u8 {
+    fn schemaToZigType(self: *Ctx, schema_in: *const ir.Schema) []const u8 {
         const schema = if (schema_in.ref) |ref|
             self.root.resolve(ref) orelse schema_in
         else
             schema_in;
 
-        const base: []const u8 = switch (schema.type) {
+        return switch (schema.type) {
             .string => "[]const u8",
             .integer => "i64",
             .number => "f64",
             .boolean => "bool",
             .array => if (schema.items) |items|
-                // Can't easily allocate here without gpa; use a static approximation
                 switch (items.type) {
                     .string => "[]const []const u8",
                     .integer => "[]const i64",
@@ -80,18 +82,9 @@ const Ctx = struct {
                 }
             else
                 "[]const anyopaque",
-            .object => "anyopaque", // nested struct ref
+            .object => "anyopaque",
             .null => "void",
             .any => "std.json.Value",
         };
-
-        if (!required or schema.nullable) {
-            // Return a nullable type string
-            // NOTE: we can't allocate here; for optional we'd need gpa.
-            // As a simple approach, just prefix with ? and hope the caller handles it.
-            // This is a known limitation of the no-alloc approach.
-            return base; // caller adds `?` prefix if not required
-        }
-        return base;
     }
 };
