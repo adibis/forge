@@ -126,6 +126,8 @@ pub const Schema = struct {
     // numeric constraints
     minimum: ?f64 = null,
     maximum: ?f64 = null,
+    exclusive_minimum: ?f64 = null,
+    exclusive_maximum: ?f64 = null,
 
     // enum (null means no enum constraint)
     enum_values: ?[]const EnumValue = null,

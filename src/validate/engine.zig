@@ -139,7 +139,9 @@ pub const Engine = struct {
         if (schema.format != .none and out == .string) {
             try self.validateFormat(out.string, schema.format, path, result);
         }
-        if (schema.minimum != null or schema.maximum != null) {
+        if (schema.minimum != null or schema.maximum != null or
+            schema.exclusive_minimum != null or schema.exclusive_maximum != null)
+        {
             try self.validateRange(out, schema, path, result);
         }
         if (out == .string) {
@@ -691,6 +693,34 @@ pub const Engine = struct {
                     .coercible = false, .coerced_to = null,
                     .message = try std.fmt.allocPrint(a,
                         "field '{s}' value {d} is greater than maximum {d}", .{ field, n, max }),
+                });
+            }
+        }
+        if (schema.exclusive_minimum) |emin| {
+            if (n <= emin) {
+                result.valid = false;
+                try result.errors.append(a, .{
+                    .field = field, .path = path,
+                    .expected = try std.fmt.allocPrint(a, "> {d}", .{emin}),
+                    .received_type = "number",
+                    .received_value = try std.fmt.allocPrint(a, "{d}", .{n}),
+                    .coercible = false, .coerced_to = null,
+                    .message = try std.fmt.allocPrint(a,
+                        "field '{s}' value {d} must be > {d} (exclusiveMinimum)", .{ field, n, emin }),
+                });
+            }
+        }
+        if (schema.exclusive_maximum) |emax| {
+            if (n >= emax) {
+                result.valid = false;
+                try result.errors.append(a, .{
+                    .field = field, .path = path,
+                    .expected = try std.fmt.allocPrint(a, "< {d}", .{emax}),
+                    .received_type = "number",
+                    .received_value = try std.fmt.allocPrint(a, "{d}", .{n}),
+                    .coercible = false, .coerced_to = null,
+                    .message = try std.fmt.allocPrint(a,
+                        "field '{s}' value {d} must be < {d} (exclusiveMaximum)", .{ field, n, emax }),
                 });
             }
         }

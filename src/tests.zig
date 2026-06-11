@@ -667,6 +667,48 @@ test "maxProperties: rejects object above maximum" {
     try std.testing.expectEqual(@as(usize, 1), vr.errors.items.len);
 }
 
+// ---- exclusiveMinimum / exclusiveMaximum tests ----
+
+test "exclusiveMinimum: rejects value equal to bound" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    var vr = try parseAndValidateKeywords(arena.allocator(),
+        \\{"type":"number","exclusiveMinimum":0}
+    , "0", false);
+    defer vr.deinit();
+    try std.testing.expect(!vr.valid);
+}
+
+test "exclusiveMinimum: accepts value above bound" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    var vr = try parseAndValidateKeywords(arena.allocator(),
+        \\{"type":"number","exclusiveMinimum":0}
+    , "0.1", false);
+    defer vr.deinit();
+    try std.testing.expect(vr.valid);
+}
+
+test "exclusiveMaximum: rejects value equal to bound" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    var vr = try parseAndValidateKeywords(arena.allocator(),
+        \\{"type":"integer","exclusiveMaximum":10}
+    , "10", false);
+    defer vr.deinit();
+    try std.testing.expect(!vr.valid);
+}
+
+test "exclusiveMaximum: accepts value below bound" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    var vr = try parseAndValidateKeywords(arena.allocator(),
+        \\{"type":"integer","exclusiveMaximum":10}
+    , "9", false);
+    defer vr.deinit();
+    try std.testing.expect(vr.valid);
+}
+
 // ---- generators/jsonschema tests ----
 
 test "jsonschema: round-trip preserves type and required" {
