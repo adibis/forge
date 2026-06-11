@@ -319,7 +319,7 @@ fn exitWithError(gpa: std.mem.Allocator, io: Io, code: u8, err_code: []const u8,
         .{ err_code, msg },
     ) catch "";
     defer if (s.len > 0) gpa.free(s);
-    Io.File.stdout().writeStreamingAll(io, s) catch {};
+    Io.File.stderr().writeStreamingAll(io, s) catch {};
     std.process.exit(code);
 }
 
