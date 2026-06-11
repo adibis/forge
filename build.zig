@@ -13,7 +13,7 @@ pub fn build(b: *std.Build) void {
     build_opts.addOption(bool,          "include_ollama",    include_ollama);
     build_opts.addOption(bool,          "include_openai",    include_openai);
     build_opts.addOption(bool,          "include_anthropic", include_anthropic);
-    build_opts.addOption([]const u8,    "version",           "0.1.0");
+    build_opts.addOption([]const u8,    "version",           "0.2.0");
 
     // Main forge binary
     const exe = b.addExecutable(.{
@@ -25,6 +25,7 @@ pub fn build(b: *std.Build) void {
         }),
     });
     exe.root_module.addOptions("build_options", build_opts);
+    exe.root_module.link_libc = true;
     b.installArtifact(exe);
 
     const run_cmd = b.addRunArtifact(exe);
