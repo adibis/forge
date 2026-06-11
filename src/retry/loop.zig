@@ -95,9 +95,9 @@ pub fn run(
         const resp = try report.buildResponse(a, &vr, true, current_input);
         const retry_prompt = resp.retry_prompt orelse "Please return valid JSON.";
 
-        var err_msgs = std.ArrayList([]const u8).init(a);
-        for (vr.errors.items) |e| try err_msgs.append(e.message);
-        const prev_errors = try err_msgs.toOwnedSlice();
+        var err_msgs: std.ArrayList([]const u8) = .empty;
+        for (vr.errors.items) |e| try err_msgs.append(a, e.message);
+        const prev_errors = try err_msgs.toOwnedSlice(a);
 
         current_input = try callProviderForRetry(gpa, io, a, opts, retry_prompt, prev_errors, attempt + 1);
     }
