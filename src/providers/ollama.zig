@@ -3,9 +3,14 @@
 const std = @import("std");
 const Io = std.Io;
 const plugin = @import("../retry/plugin.zig");
-const util = @import("util.zig");
 
 const DEFAULT_HOST = "http://localhost:11434";
+
+const Body = struct {
+    model: []const u8,
+    prompt: []const u8,
+    stream: bool,
+};
 
 pub fn call(
     gpa: std.mem.Allocator,
@@ -32,9 +37,11 @@ pub fn call(
     }
 
     const api_url = try std.fmt.allocPrint(a, "{s}/api/generate", .{host});
-    const body_json = try std.fmt.allocPrint(a,
-        \\{{"model":"{s}","prompt":"{s}","stream":false}}
-    , .{ model, try util.jsonEscape(a, full_prompt) });
+    const body_json = try std.json.Stringify.valueAlloc(a, Body{
+        .model = model,
+        .prompt = full_prompt,
+        .stream = false,
+    }, .{});
 
     const argv = [_][]const u8{
         "curl", "-s", "-X", "POST", api_url,

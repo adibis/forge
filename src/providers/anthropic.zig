@@ -3,10 +3,16 @@
 const std = @import("std");
 const Io = std.Io;
 const plugin = @import("../retry/plugin.zig");
-const util = @import("util.zig");
 
 const ANTHROPIC_API = "https://api.anthropic.com/v1/messages";
 const DEFAULT_MODEL = "claude-haiku-4-5-20251001";
+
+const Message = struct { role: []const u8, content: []const u8 };
+const Body = struct {
+    model: []const u8,
+    max_tokens: u32,
+    messages: []const Message,
+};
 
 pub fn call(
     gpa: std.mem.Allocator,
@@ -32,9 +38,11 @@ pub fn call(
             .{ req.attempt_number, full_prompt });
     }
 
-    const body_json = try std.fmt.allocPrint(a,
-        \\{{"model":"{s}","max_tokens":4096,"messages":[{{"role":"user","content":"{s}"}}]}}
-    , .{ model, try util.jsonEscape(a, full_prompt) });
+    const body_json = try std.json.Stringify.valueAlloc(a, Body{
+        .model = model,
+        .max_tokens = 4096,
+        .messages = &[_]Message{.{ .role = "user", .content = full_prompt }},
+    }, .{});
 
     const auth_header = try std.fmt.allocPrint(a, "x-api-key: {s}", .{api_key});
 

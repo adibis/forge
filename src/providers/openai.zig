@@ -3,10 +3,15 @@
 const std = @import("std");
 const Io = std.Io;
 const plugin = @import("../retry/plugin.zig");
-const util = @import("util.zig");
 
 const OPENAI_API = "https://api.openai.com/v1/chat/completions";
 const DEFAULT_MODEL = "gpt-4o-mini";
+
+const Message = struct { role: []const u8, content: []const u8 };
+const Body = struct {
+    model: []const u8,
+    messages: []const Message,
+};
 
 pub fn call(
     gpa: std.mem.Allocator,
@@ -32,9 +37,10 @@ pub fn call(
             .{ req.attempt_number, full_prompt });
     }
 
-    const body_json = try std.fmt.allocPrint(a,
-        \\{{"model":"{s}","messages":[{{"role":"user","content":"{s}"}}]}}
-    , .{ model, try util.jsonEscape(a, full_prompt) });
+    const body_json = try std.json.Stringify.valueAlloc(a, Body{
+        .model = model,
+        .messages = &[_]Message{.{ .role = "user", .content = full_prompt }},
+    }, .{});
 
     const auth_header = try std.fmt.allocPrint(a, "Authorization: Bearer {s}", .{api_key});
 
