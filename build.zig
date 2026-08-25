@@ -28,6 +28,7 @@ pub fn build(b: *std.Build) void {
     });
     exe.root_module.addOptions("build_options", build_opts);
     exe.root_module.link_libc = true;
+    exe.root_module.addCSourceFile(.{ .file = b.path("src/validate/regex_shim.c"), .flags = &.{} });
     b.installArtifact(exe);
 
     const run_cmd = b.addRunArtifact(exe);
@@ -56,6 +57,12 @@ pub fn build(b: *std.Build) void {
                 .optimize = optimize,
             }),
         });
+        // "integration" is the only test module that reaches validate/engine.zig,
+        // which needs the regex.h shim — see regex_shim.c.
+        if (std.mem.eql(u8, m.name, "integration")) {
+            t.root_module.link_libc = true;
+            t.root_module.addCSourceFile(.{ .file = b.path("src/validate/regex_shim.c"), .flags = &.{} });
+        }
         test_step.dependOn(&b.addRunArtifact(t).step);
     }
 }

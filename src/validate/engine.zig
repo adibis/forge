@@ -1,6 +1,14 @@
 const std = @import("std");
 const ir = @import("../schema/ir.zig");
-const c = @cImport(@cInclude("regex.h"));
+
+// See regex_shim.c — regex_t can't be declared directly from Zig on glibc.
+const c = struct {
+    extern fn forge_regex_alloc() ?*anyopaque;
+    extern fn forge_regex_dealloc(preg: ?*anyopaque) void;
+    extern fn forge_regcomp(preg: ?*anyopaque, pattern: [*:0]const u8) c_int;
+    extern fn forge_regexec(preg: ?*const anyopaque, string: [*:0]const u8) c_int;
+    extern fn forge_regfree(preg: ?*anyopaque) void;
+};
 
 pub const ValidationError = struct {
     field: []const u8,
@@ -830,12 +838,14 @@ fn matchesPattern(arena: std.mem.Allocator, s: []const u8, pattern: []const u8) 
     const pattern_z = arena.dupeZ(u8, pattern) catch return .invalid_pattern;
     const s_z = arena.dupeZ(u8, s) catch return .invalid_pattern;
 
-    var preg: c.regex_t = undefined;
-    if (c.regcomp(&preg, pattern_z, c.REG_EXTENDED | c.REG_NOSUB) != 0)
-        return .invalid_pattern;
-    defer c.regfree(&preg);
+    const preg = c.forge_regex_alloc() orelse return .invalid_pattern;
+    defer c.forge_regex_dealloc(preg);
 
-    return if (c.regexec(&preg, s_z, 0, null, 0) == 0) .matches else .no_match;
+    if (c.forge_regcomp(preg, pattern_z) != 0)
+        return .invalid_pattern;
+    defer c.forge_regfree(preg);
+
+    return if (c.forge_regexec(preg, s_z) == 0) .matches else .no_match;
 }
 
 // --- format validators ---
