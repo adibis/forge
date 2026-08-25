@@ -199,9 +199,10 @@ echo "$llm_response" | forge retry \
 {"status":"ok","attempts":2,"data":{"name":"Alice","age":30,"status":"active"}}
 ```
 
-The `--provider` flag names a binary on your `$PATH` prefixed with
-`forge-provider-`. The built-in providers are `anthropic`, `openai`, and
-`ollama`. See [Custom providers](#custom-providers) to write your own.
+The `--provider` flag names either a built-in provider or a binary on your
+`$PATH` prefixed with `forge-provider-` for anything else. The built-ins are
+`anthropic`, `openai`, `ollama`, and `llamacpp`. See
+[Custom providers](#custom-providers) to write your own.
 
 Provider configuration is via environment variables:
 
@@ -210,6 +211,13 @@ Provider configuration is via environment variables:
 | `anthropic` | `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` (default: `claude-haiku`) |
 | `openai` | `OPENAI_API_KEY`, `OPENAI_MODEL` (default: `gpt-4o-mini`) |
 | `ollama` | `OLLAMA_HOST` (default: `http://localhost:11434`), `OLLAMA_MODEL` (required) |
+| `llamacpp` | `LLAMACPP_HOST` (default: `http://localhost:8080`), `LLAMACPP_MODEL` (optional), `LLAMACPP_API_KEY` (optional) |
+
+`llamacpp` talks to a local [`llama-server`](https://github.com/ggml-org/llama.cpp)
+instance over its OpenAI-compatible `/v1/chat/completions` endpoint. It's the
+right choice for small ARM/RISC-V boards — llama.cpp has official builds for
+armv6/armv7/aarch64/riscv64 and a footprint that fits in 512MB, whereas Ollama
+only ships amd64/arm64 builds. See [Edge and embedded](#edge-and-embedded).
 
 ### generate
 
@@ -340,14 +348,15 @@ On error, write to stdout and exit non-zero:
 
 3. Rebuild: `zig build -Doptimize=ReleaseFast`
 
-The built-in providers (`ollama`, `openai`, `anthropic`) follow the same pattern and
-are good reference implementations.
+The built-in providers (`ollama`, `openai`, `anthropic`, `llamacpp`) follow the
+same pattern and are good reference implementations.
 
 ---
 
 ## Edge and embedded
 
-forge cross-compiles to any target Zig supports:
+forge cross-compiles to any target Zig supports, including boards small
+enough to run a local LLM directly on the same device that needs the answer:
 
 ```sh
 zig build -Dtarget=aarch64-linux-musl -Doptimize=ReleaseFast
@@ -359,16 +368,41 @@ embedded Linux routers, and edge nodes where Python or Node runtimes are
 unavailable.
 
 `retry` requires spawning a provider subprocess and making HTTP calls to an LLM
-API. It works on any edge node with outbound connectivity. If you are running
-Ollama locally on the device, the full retry pipeline works there too.
+API. It works on any edge node with outbound connectivity. On-device, that
+means whatever's actually serving the model on that hardware — see the table
+below.
+
+| Board | RAM | Target triple | Feasible model class | On-device server |
+|---|---|---|---|---|
+| Raspberry Pi Zero / Zero W (ARMv6) | 512MB | `arm-linux-musleabihf` `-Dcpu=arm1176jzf_s` | ~135M–500M params, Q4 GGUF | `llamacpp` (Ollama has no armv6 build) |
+| Banana Pi Zero / Orange Pi Zero, Pi 2 (ARMv7-A) | 512MB | `arm-linux-musleabihf` `-Dcpu=cortex_a7` | ~135M–500M params, Q4 GGUF | `llamacpp` (Ollama has no armv7 build) |
+| Raspberry Pi Zero 2 W (aarch64) | 512MB | `aarch64-linux-musl` | ~500M–1B params, Q4 GGUF | `llamacpp` (lighter footprint than Ollama at this RAM) |
+| VisionFive 2 (RISC-V, riscv64) | 2–8GB | `riscv64-linux-musl` | 1B–3B params comfortably | `llamacpp` |
+| Banana Pi BPI-F3 (RISC-V, riscv64) | up to 16GB | `riscv64-linux-musl` | 3B–7B params, e.g. `qwen2.5-coder:7b` class | `llamacpp` or `ollama` (arm64/amd64/riscv64 support varies by release) |
+
+Ollama's official builds cover amd64 and arm64 only, and its Go-runtime
+footprint is heavier than these boards' RAM budgets can comfortably spare.
+`llama.cpp`'s `llama-server` has real armv6/armv7/aarch64/riscv64 builds and
+exposes an OpenAI-compatible `/v1/chat/completions` endpoint — that's what
+the built-in `llamacpp` provider talks to. Point `retry --provider llamacpp`
+at it and the full validate → repair → retry loop runs entirely on-device.
 
 **Tiny LLMs and the JSON validation problem**
 
-Small language models running on edge devices produce structured JSON outputs
-that drive real actions — controlling home automation, issuing robot commands,
-generating sensor alerts, feeding industrial pipelines. When that JSON is
-malformed or schema-invalid, the failure is often silent: a broken automation,
-a dropped command, a blocked alert.
+Small local models increasingly sit behind a voice or sensor front-end and
+are the part that actually decides what happens — a tool-calling model on a
+Home Assistant server turning "turn off the lights" into a service call, a
+robot's onboard SBC turning a command into a motor instruction, a gateway
+box turning a sensor reading into an alert. That decision-making model runs
+on the SBC or small server behind the front-end (see the board table above),
+not on the front-end device itself, and it's usually a much smaller model
+than a frontier cloud model — which means it gets the JSON wrong more often.
+When that happens, the failure is frequently silent: a broken automation, a
+dropped command, a blocked alert, or — worse — a full extra round trip
+through wake word, audio capture, and speech-to-text just to ask the user to
+repeat themselves. Catching and repairing the malformed JSON in place, or
+retrying with a small targeted re-prompt instead of a fresh conversation
+turn, is exactly what `forge retry` is for.
 
 The forge binary requires a POSIX environment. However the core algorithms
 (`parse/`, `validate/`, `schema/`) are pure Zig with allocator interfaces and
@@ -403,7 +437,7 @@ Target environments:
 **Longer term**
 
 - WASM build target
-- Additional provider plugins (Gemini, Mistral, local llama.cpp server)
+- Additional provider plugins (Gemini, Mistral)
 - Schema inference: generate a JSON Schema from example outputs
 
 ---

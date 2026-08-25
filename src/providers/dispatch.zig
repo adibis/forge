@@ -1,8 +1,9 @@
 // Provider dispatch: routes by name to built-in providers, falls back to subprocess for custom ones.
 // Build flags control which built-in providers are compiled in:
-//   -Dollama=false   omit Ollama   (default: included)
-//   -Dopenai=false   omit OpenAI   (default: included)
-//   -Danthropiclient=false  omit Anthropic  (default: included)
+//   -Dollama=false          omit Ollama       (default: included)
+//   -Dopenai=false          omit OpenAI       (default: included)
+//   -Danthropiclient=false  omit Anthropic    (default: included)
+//   -Dllamacpp=false        omit llama.cpp    (default: included)
 const std = @import("std");
 const Io = std.Io;
 const build_options = @import("build_options");
@@ -28,6 +29,11 @@ pub fn call(
     if (comptime build_options.include_anthropic) {
         if (std.mem.eql(u8, provider_name, "anthropic")) {
             return @import("anthropic.zig").call(gpa, io, req, env);
+        }
+    }
+    if (comptime build_options.include_llamacpp) {
+        if (std.mem.eql(u8, provider_name, "llamacpp")) {
+            return @import("llamacpp.zig").call(gpa, io, req, env);
         }
     }
 

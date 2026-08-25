@@ -8,11 +8,13 @@ pub fn build(b: *std.Build) void {
     const include_ollama = b.option(bool, "ollama", "Include built-in Ollama provider (default: true)") orelse true;
     const include_openai = b.option(bool, "openai", "Include built-in OpenAI provider (default: true)") orelse true;
     const include_anthropic = b.option(bool, "anthropiclient", "Include built-in Anthropic provider (default: true)") orelse true;
+    const include_llamacpp = b.option(bool, "llamacpp", "Include built-in llama.cpp provider (default: true)") orelse true;
 
     const build_opts = b.addOptions();
     build_opts.addOption(bool, "include_ollama", include_ollama);
     build_opts.addOption(bool, "include_openai", include_openai);
     build_opts.addOption(bool, "include_anthropic", include_anthropic);
+    build_opts.addOption(bool, "include_llamacpp", include_llamacpp);
     build_opts.addOption([]const u8, "version", "0.2.0");
 
     // Main forge binary
