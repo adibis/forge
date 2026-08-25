@@ -49,16 +49,27 @@ jobs:
 
   cross-compile:
     # Build-only check (no test run) across every target release.yml ships,
-    # so a target that fails to cross-compile (e.g. missing link_libc) is
-    # caught on every PR instead of when cutting a release.
+    # plus small-SBC targets relevant to the edge/tiny-LLM use case, so a
+    # target that fails to cross-compile (e.g. missing link_libc) is caught
+    # on every PR instead of when cutting a release.
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        target:
-          - x86_64-linux-musl
-          - aarch64-linux-musl
-          - aarch64-macos
-          - x86_64-macos
+        include:
+          - target: x86_64-linux-musl
+            cpu: baseline
+          - target: aarch64-linux-musl
+            cpu: baseline
+          - target: aarch64-macos
+            cpu: baseline
+          - target: x86_64-macos
+            cpu: baseline
+          - target: arm-linux-musleabihf
+            cpu: arm1176jzf_s # Raspberry Pi Zero / Zero W / Pi 1
+          - target: arm-linux-musleabihf
+            cpu: cortex_a7 # Banana Pi Zero, Orange Pi Zero, Pi 2
+          - target: riscv64-linux-musl
+            cpu: baseline # modern RISC-V SBCs (Milk-V Duo, VisionFive, BPI-F3)
     steps:
       - uses: actions/checkout@v4
 
@@ -68,5 +79,5 @@ jobs:
           curl -fsSL "https://ziglang.org/download/0.16.0/zig-x86_64-linux-0.16.0.tar.xz" | tar -xJ
           echo "$PWD/zig-x86_64-linux-0.16.0" >> "$GITHUB_PATH"
 
-      - name: Build for ${{ matrix.target }}
-        run: zig build -Doptimize=ReleaseFast -Dtarget=${{ matrix.target }}
+      - name: Build for ${{ matrix.target }} (${{ matrix.cpu }})
+        run: zig build -Doptimize=ReleaseFast -Dtarget=${{ matrix.target }} -Dcpu=${{ matrix.cpu }}
