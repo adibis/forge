@@ -386,9 +386,7 @@ These are the planned directions for forge, in rough priority order.
 **Near term**
 
 - YAML schema input (`--schema model.yaml`)
-- `--output <file>` flag on all subcommands
 - Streaming input support (validate as tokens arrive)
-- Full `pattern` support (regex evaluation)
 
 **Medium term — libforge**
 
