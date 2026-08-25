@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  test:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            zig_host: x86_64-linux
+          - os: macos-latest
+            zig_host: aarch64-macos
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Zig 0.16.0
+        shell: bash
+        run: |
+          curl -fsSL "https://ziglang.org/download/0.16.0/zig-${{ matrix.zig_host }}-0.16.0.tar.xz" | tar -xJ
+          echo "$PWD/zig-${{ matrix.zig_host }}-0.16.0" >> "$GITHUB_PATH"
+
+      - name: Build
+        run: zig build
+
+      - name: Test
+        run: zig build test
+
+  cross-compile:
+    # Build-only check (no test run) across every target release.yml ships,
+    # so a target that fails to cross-compile (e.g. missing link_libc) is
+    # caught on every PR instead of when cutting a release.
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target:
+          - x86_64-linux-musl
+          - aarch64-linux-musl
+          - aarch64-macos
+          - x86_64-macos
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Zig 0.16.0
+        shell: bash
+        run: |
+          curl -fsSL "https://ziglang.org/download/0.16.0/zig-x86_64-linux-0.16.0.tar.xz" | tar -xJ
+          echo "$PWD/zig-x86_64-linux-0.16.0" >> "$GITHUB_PATH"
+
+      - name: Build for ${{ matrix.target }}
+        run: zig build -Doptimize=ReleaseFast -Dtarget=${{ matrix.target }}
