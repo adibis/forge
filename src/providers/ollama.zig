@@ -26,14 +26,14 @@ pub fn call(
     const model = env.get("OLLAMA_MODEL") orelse return error.MissingOllamaModel;
     const verbose = env.get("FORGE_VERBOSE") != null;
 
-    const full_prompt = try std.fmt.allocPrint(a,
+    const full_prompt = try std.fmt.allocPrint(
+        a,
         "You are a JSON API. Return ONLY valid JSON — no explanation, no markdown.\n\nSchema:\n{s}\n\n{s}",
         .{ req.schema_json, req.prompt },
     );
 
     if (verbose) {
-        std.debug.print("\n[forge-provider-ollama] attempt {d}\n>>> PROMPT >>>\n{s}\n<<<\n",
-            .{ req.attempt_number, full_prompt });
+        std.debug.print("\n[forge-provider-ollama] attempt {d}\n>>> PROMPT >>>\n{s}\n<<<\n", .{ req.attempt_number, full_prompt });
     }
 
     const api_url = try std.fmt.allocPrint(a, "{s}/api/generate", .{host});
@@ -44,13 +44,14 @@ pub fn call(
     }, .{});
 
     const argv = [_][]const u8{
-        "curl", "-s", "-X", "POST", api_url,
-        "-H", "content-type: application/json",
-        "-d", body_json,
+        "curl", "-s",                             "-X", "POST",    api_url,
+        "-H",   "content-type: application/json", "-d", body_json,
     };
 
     var child = std.process.spawn(io, .{
-        .argv = &argv, .stdout = .pipe, .stderr = .inherit,
+        .argv = &argv,
+        .stdout = .pipe,
+        .stderr = .inherit,
     }) catch return error.ProviderNetworkError;
 
     const stdout_file = child.stdout.?;

@@ -256,7 +256,7 @@ test "report: coercions reflected in response" {
 fn collectOutput(comptime genFn: anytype, args: anytype) ![]const u8 {
     var aw: std.Io.Writer.Allocating = .init(std.testing.allocator);
     const w = &aw.writer;
-    try @call(.auto, genFn, args ++ .{w, std.testing.allocator});
+    try @call(.auto, genFn, args ++ .{ w, std.testing.allocator });
     return aw.toOwnedSlice();
 }
 

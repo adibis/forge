@@ -31,8 +31,10 @@ pub const Response = struct {
 
     pub fn jsonStringify(self: Response, jw: anytype) !void {
         try jw.beginObject();
-        try jw.objectField("status");          try jw.write(self.status);
-        try jw.objectField("input_parseable"); try jw.write(self.input_parseable);
+        try jw.objectField("status");
+        try jw.write(self.status);
+        try jw.objectField("input_parseable");
+        try jw.write(self.input_parseable);
 
         try jw.objectField("errors");
         try jw.beginArray();
@@ -77,7 +79,10 @@ pub fn buildResponse(
     const status = if (vr.valid) "ok" else blk: {
         var all_coercible = vr.errors.items.len > 0;
         for (vr.errors.items) |err| {
-            if (!err.coercible) { all_coercible = false; break; }
+            if (!err.coercible) {
+                all_coercible = false;
+                break;
+            }
         }
         break :blk if (all_coercible) "coercible" else "error";
     };

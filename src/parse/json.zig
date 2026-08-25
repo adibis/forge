@@ -149,9 +149,18 @@ fn isTruncated(input: []const u8) bool {
     var in_string = false;
     var escape = false;
     for (input) |ch| {
-        if (escape) { escape = false; continue; }
-        if (ch == '\\' and in_string) { escape = true; continue; }
-        if (ch == '"') { in_string = !in_string; continue; }
+        if (escape) {
+            escape = false;
+            continue;
+        }
+        if (ch == '\\' and in_string) {
+            escape = true;
+            continue;
+        }
+        if (ch == '"') {
+            in_string = !in_string;
+            continue;
+        }
         if (in_string) continue;
         if (ch == '{' or ch == '[') depth += 1;
         if (ch == '}' or ch == ']') depth -= 1;

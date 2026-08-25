@@ -151,13 +151,17 @@ fn runRetry(gpa: std.mem.Allocator, io: Io, args: []const [:0]const u8, env: *co
     var i: usize = 0;
     while (i < args.len) : (i += 1) {
         if (std.mem.eql(u8, args[i], "--schema") and i + 1 < args.len) {
-            i += 1; schema_path = args[i];
+            i += 1;
+            schema_path = args[i];
         } else if (std.mem.eql(u8, args[i], "--input") and i + 1 < args.len) {
-            i += 1; input_path = args[i];
+            i += 1;
+            input_path = args[i];
         } else if (std.mem.eql(u8, args[i], "--output") and i + 1 < args.len) {
-            i += 1; output_path = args[i];
+            i += 1;
+            output_path = args[i];
         } else if (std.mem.eql(u8, args[i], "--provider") and i + 1 < args.len) {
-            i += 1; provider = args[i];
+            i += 1;
+            provider = args[i];
         } else if (std.mem.eql(u8, args[i], "--max-retries") and i + 1 < args.len) {
             i += 1;
             max_retries = std.fmt.parseInt(u32, args[i], 10) catch 3;
@@ -196,8 +200,7 @@ fn runRetry(gpa: std.mem.Allocator, io: Io, args: []const [:0]const u8, env: *co
     defer gpa.free(out_json);
 
     var resp_buf: [128]u8 = undefined;
-    const wrapper = std.fmt.bufPrint(&resp_buf,
-        "{{\"status\":\"ok\",\"attempts\":{d},\"data\":", .{result.attempts}) catch return;
+    const wrapper = std.fmt.bufPrint(&resp_buf, "{{\"status\":\"ok\",\"attempts\":{d},\"data\":", .{result.attempts}) catch return;
     emit(io, out_file, wrapper);
     emit(io, out_file, out_json);
     emit(io, out_file, "}\n");
@@ -214,13 +217,17 @@ fn runGenerate(gpa: std.mem.Allocator, io: Io, args: []const [:0]const u8) !void
     var i: usize = 0;
     while (i < args.len) : (i += 1) {
         if (std.mem.eql(u8, args[i], "--schema") and i + 1 < args.len) {
-            i += 1; schema_path = args[i];
+            i += 1;
+            schema_path = args[i];
         } else if (std.mem.eql(u8, args[i], "--output") and i + 1 < args.len) {
-            i += 1; output_path = args[i];
+            i += 1;
+            output_path = args[i];
         } else if (std.mem.eql(u8, args[i], "--target") and i + 1 < args.len) {
-            i += 1; target = args[i];
+            i += 1;
+            target = args[i];
         } else if (std.mem.eql(u8, args[i], "--model-name") and i + 1 < args.len) {
-            i += 1; model_name = args[i];
+            i += 1;
+            model_name = args[i];
         }
     }
 
@@ -270,11 +277,14 @@ fn parseCommonArgs(
     var i: usize = 0;
     while (i < args.len) : (i += 1) {
         if (std.mem.eql(u8, args[i], "--schema") and i + 1 < args.len) {
-            i += 1; schema_path.* = args[i];
+            i += 1;
+            schema_path.* = args[i];
         } else if (std.mem.eql(u8, args[i], "--input") and i + 1 < args.len) {
-            i += 1; input_path.* = args[i];
+            i += 1;
+            input_path.* = args[i];
         } else if (std.mem.eql(u8, args[i], "--output") and i + 1 < args.len) {
-            i += 1; output_path.* = args[i];
+            i += 1;
+            output_path.* = args[i];
         }
     }
 }
@@ -314,7 +324,8 @@ fn emitJson(gpa: std.mem.Allocator, io: Io, out: ?Io.File, value: anytype) void 
 }
 
 fn exitWithError(gpa: std.mem.Allocator, io: Io, code: u8, err_code: []const u8, msg: []const u8) noreturn {
-    const s = std.fmt.allocPrint(gpa,
+    const s = std.fmt.allocPrint(
+        gpa,
         "{{\"status\":\"error\",\"code\":\"{s}\",\"message\":\"{s}\"}}\n",
         .{ err_code, msg },
     ) catch "";

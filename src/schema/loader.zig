@@ -182,7 +182,9 @@ pub fn loadSchema(root: *ir.SchemaRoot, val: std.json.Value) LoadError!ir.Schema
 
     if (obj.get("additionalProperties")) |v| {
         switch (v) {
-            .bool => |b| { if (!b) schema.additional_properties_forbidden = true; },
+            .bool => |b| {
+                if (!b) schema.additional_properties_forbidden = true;
+            },
             .object => {
                 const child = try arena.create(ir.Schema);
                 child.* = try loadSchema(root, v);

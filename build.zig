@@ -5,15 +5,15 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
 
     // Provider compile-time flags (all default true)
-    const include_ollama    = b.option(bool, "ollama",    "Include built-in Ollama provider (default: true)")    orelse true;
-    const include_openai    = b.option(bool, "openai",    "Include built-in OpenAI provider (default: true)")    orelse true;
+    const include_ollama = b.option(bool, "ollama", "Include built-in Ollama provider (default: true)") orelse true;
+    const include_openai = b.option(bool, "openai", "Include built-in OpenAI provider (default: true)") orelse true;
     const include_anthropic = b.option(bool, "anthropiclient", "Include built-in Anthropic provider (default: true)") orelse true;
 
     const build_opts = b.addOptions();
-    build_opts.addOption(bool,          "include_ollama",    include_ollama);
-    build_opts.addOption(bool,          "include_openai",    include_openai);
-    build_opts.addOption(bool,          "include_anthropic", include_anthropic);
-    build_opts.addOption([]const u8,    "version",           "0.2.0");
+    build_opts.addOption(bool, "include_ollama", include_ollama);
+    build_opts.addOption(bool, "include_openai", include_openai);
+    build_opts.addOption(bool, "include_anthropic", include_anthropic);
+    build_opts.addOption([]const u8, "version", "0.2.0");
 
     // Main forge binary
     const exe = b.addExecutable(.{
@@ -37,13 +37,13 @@ pub fn build(b: *std.Build) void {
     // Test suite
     const test_modules = [_]struct { name: []const u8, path: []const u8 }{
         // standalone modules (no cross-directory imports)
-        .{ .name = "schema-ir",     .path = "src/schema/ir.zig" },
+        .{ .name = "schema-ir", .path = "src/schema/ir.zig" },
         .{ .name = "schema-loader", .path = "src/schema/loader.zig" },
         .{ .name = "parse-extract", .path = "src/parse/extract.zig" },
-        .{ .name = "parse-json",    .path = "src/parse/json.zig" },
-        .{ .name = "levenshtein",   .path = "src/util/levenshtein.zig" },
+        .{ .name = "parse-json", .path = "src/parse/json.zig" },
+        .{ .name = "levenshtein", .path = "src/util/levenshtein.zig" },
         // cross-module tests (engine, generate, errors — all via src/tests.zig)
-        .{ .name = "integration",   .path = "src/tests.zig" },
+        .{ .name = "integration", .path = "src/tests.zig" },
     };
     const test_step = b.step("test", "Run all tests");
     for (test_modules) |m| {

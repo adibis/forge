@@ -49,9 +49,7 @@ pub fn run(
                 std.debug.print("[forge retry] attempt {d}: parse failed ({s}), calling provider\n", .{ attempt, @errorName(e) });
             }
             if (attempt == opts.max_retries) return e;
-            const prompt = try std.fmt.allocPrint(a,
-                "The JSON you returned could not be parsed: {s}. Please return only valid JSON.",
-                .{@errorName(e)});
+            const prompt = try std.fmt.allocPrint(a, "The JSON you returned could not be parsed: {s}. Please return only valid JSON.", .{@errorName(e)});
             current_input = try callProviderForRetry(gpa, io, a, opts, prompt, &.{}, attempt + 1);
             continue;
         };

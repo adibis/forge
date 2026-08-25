@@ -28,14 +28,14 @@ pub fn call(
     const model = env.get("ANTHROPIC_MODEL") orelse DEFAULT_MODEL;
     const verbose = env.get("FORGE_VERBOSE") != null;
 
-    const full_prompt = try std.fmt.allocPrint(a,
+    const full_prompt = try std.fmt.allocPrint(
+        a,
         "You are a JSON API. Return ONLY valid JSON — no explanation, no markdown.\n\nSchema:\n{s}\n\n{s}",
         .{ req.schema_json, req.prompt },
     );
 
     if (verbose) {
-        std.debug.print("\n[forge-provider-anthropic] attempt {d}\n>>> PROMPT >>>\n{s}\n<<<\n",
-            .{ req.attempt_number, full_prompt });
+        std.debug.print("\n[forge-provider-anthropic] attempt {d}\n>>> PROMPT >>>\n{s}\n<<<\n", .{ req.attempt_number, full_prompt });
     }
 
     const body_json = try std.json.Stringify.valueAlloc(a, Body{
@@ -47,15 +47,15 @@ pub fn call(
     const auth_header = try std.fmt.allocPrint(a, "x-api-key: {s}", .{api_key});
 
     const argv = [_][]const u8{
-        "curl", "-s", "-X", "POST", ANTHROPIC_API,
-        "-H", auth_header,
-        "-H", "anthropic-version: 2023-06-01",
-        "-H", "content-type: application/json",
-        "-d", body_json,
+        "curl",                           "-s",        "-X",      "POST",                          ANTHROPIC_API,
+        "-H",                             auth_header, "-H",      "anthropic-version: 2023-06-01", "-H",
+        "content-type: application/json", "-d",        body_json,
     };
 
     var child = std.process.spawn(io, .{
-        .argv = &argv, .stdout = .pipe, .stderr = .inherit,
+        .argv = &argv,
+        .stdout = .pipe,
+        .stderr = .inherit,
     }) catch return error.ProviderNetworkError;
 
     const stdout_file = child.stdout.?;

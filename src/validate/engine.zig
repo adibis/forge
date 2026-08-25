@@ -14,16 +14,24 @@ pub const ValidationError = struct {
 
     pub fn jsonStringify(self: ValidationError, jw: anytype) !void {
         try jw.beginObject();
-        try jw.objectField("field");       try jw.write(self.field);
-        try jw.objectField("path");        try jw.write(self.path);
-        try jw.objectField("expected");    try jw.write(self.expected);
-        try jw.objectField("received_type"); try jw.write(self.received_type);
-        try jw.objectField("received_value"); try jw.write(self.received_value);
-        try jw.objectField("coercible");   try jw.write(self.coercible);
+        try jw.objectField("field");
+        try jw.write(self.field);
+        try jw.objectField("path");
+        try jw.write(self.path);
+        try jw.objectField("expected");
+        try jw.write(self.expected);
+        try jw.objectField("received_type");
+        try jw.write(self.received_type);
+        try jw.objectField("received_value");
+        try jw.write(self.received_value);
+        try jw.objectField("coercible");
+        try jw.write(self.coercible);
         if (self.coerced_to) |ct| {
-            try jw.objectField("coerced_to"); try jw.write(ct);
+            try jw.objectField("coerced_to");
+            try jw.write(ct);
         }
-        try jw.objectField("message");     try jw.write(self.message);
+        try jw.objectField("message");
+        try jw.write(self.message);
         try jw.endObject();
     }
 };
@@ -36,10 +44,14 @@ pub const Coercion = struct {
 
     pub fn jsonStringify(self: Coercion, jw: anytype) !void {
         try jw.beginObject();
-        try jw.objectField("path");   try jw.write(self.path);
-        try jw.objectField("from");   try jw.write(self.from);
-        try jw.objectField("to");     try jw.write(self.to);
-        try jw.objectField("reason"); try jw.write(self.reason);
+        try jw.objectField("path");
+        try jw.write(self.path);
+        try jw.objectField("from");
+        try jw.write(self.from);
+        try jw.objectField("to");
+        try jw.write(self.to);
+        try jw.objectField("reason");
+        try jw.write(self.reason);
         try jw.endObject();
     }
 };
@@ -110,12 +122,14 @@ pub const Engine = struct {
                 result.valid = false;
                 const field = fieldFromPath(path);
                 try result.errors.append(a, .{
-                    .field = field, .path = path,
+                    .field = field,
+                    .path = path,
                     .expected = schema.type.label(),
-                    .received_type = "null", .received_value = "null",
-                    .coercible = false, .coerced_to = null,
-                    .message = try std.fmt.allocPrint(a,
-                        "field '{s}' expected {s}, received null", .{ field, schema.type.label() }),
+                    .received_type = "null",
+                    .received_value = "null",
+                    .coercible = false,
+                    .coerced_to = null,
+                    .message = try std.fmt.allocPrint(a, "field '{s}' expected {s}, received null", .{ field, schema.type.label() }),
                 });
             }
             return value;
@@ -179,14 +193,14 @@ pub const Engine = struct {
         const actual = jsonTypeLabel(value);
 
         const matches = switch (expected) {
-            .string  => value == .string,
-            .number  => value == .float or value == .integer or value == .number_string,
+            .string => value == .string,
+            .number => value == .float or value == .integer or value == .number_string,
             .integer => value == .integer,
             .boolean => value == .bool,
-            .array   => value == .array,
-            .object  => value == .object,
-            .null    => value == .null,
-            .any     => true,
+            .array => value == .array,
+            .object => value == .object,
+            .null => value == .null,
+            .any => true,
         };
         if (matches) return value;
 
@@ -232,17 +246,18 @@ pub const Engine = struct {
             if (value == .array and value.array.items.len == 1) {
                 const inner = value.array.items[0];
                 const inner_ok = switch (expected) {
-                    .string  => inner == .string,
-                    .number  => inner == .float or inner == .integer,
+                    .string => inner == .string,
+                    .number => inner == .float or inner == .integer,
                     .integer => inner == .integer,
                     .boolean => inner == .bool,
                     else => false,
                 };
                 if (inner_ok) {
-                    try result.warnings.append(a, try std.fmt.allocPrint(a,
-                        "field '{s}': unwrapped single-element array to scalar", .{fieldFromPath(path)}));
+                    try result.warnings.append(a, try std.fmt.allocPrint(a, "field '{s}': unwrapped single-element array to scalar", .{fieldFromPath(path)}));
                     try result.coercions.append(a, .{
-                        .path = path, .from = "[...]", .to = "(scalar)",
+                        .path = path,
+                        .from = "[...]",
+                        .to = "(scalar)",
                         .reason = "single-item array unwrap",
                     });
                     return inner;
@@ -253,14 +268,14 @@ pub const Engine = struct {
         result.valid = false;
         const field = fieldFromPath(path);
         try result.errors.append(a, .{
-            .field = field, .path = path,
+            .field = field,
+            .path = path,
             .expected = expected.label(),
             .received_type = actual,
             .received_value = try jsonValueRepr(a, value),
-            .coercible = false, .coerced_to = null,
-            .message = try std.fmt.allocPrint(a,
-                "field '{s}' expected {s}, received {s} — no safe cast available",
-                .{ field, expected.label(), actual }),
+            .coercible = false,
+            .coerced_to = null,
+            .message = try std.fmt.allocPrint(a, "field '{s}' expected {s}, received {s} — no safe cast available", .{ field, expected.label(), actual }),
         });
         return value;
     }
@@ -276,13 +291,14 @@ pub const Engine = struct {
         if (jsonToEnumValue(value).eql(cv)) return;
         result.valid = false;
         try result.errors.append(a, .{
-            .field = fieldFromPath(path), .path = path,
+            .field = fieldFromPath(path),
+            .path = path,
             .expected = cv.label(),
             .received_type = jsonTypeLabel(value),
             .received_value = try jsonValueRepr(a, value),
-            .coercible = false, .coerced_to = null,
-            .message = try std.fmt.allocPrint(a,
-                "field '{s}' must be {s} (const)", .{ fieldFromPath(path), cv.label() }),
+            .coercible = false,
+            .coerced_to = null,
+            .message = try std.fmt.allocPrint(a, "field '{s}' must be {s} (const)", .{ fieldFromPath(path), cv.label() }),
         });
     }
 
@@ -311,17 +327,20 @@ pub const Engine = struct {
                     const from = try std.fmt.allocPrint(a, "\"{s}\"", .{value.string});
                     const to = try std.fmt.allocPrint(a, "\"{s}\"", .{matched});
                     try result.coercions.append(a, .{
-                        .path = path, .from = from, .to = to,
+                        .path = path,
+                        .from = from,
+                        .to = to,
                         .reason = "enum case fold / fuzzy match",
                     });
                     try result.errors.append(a, .{
-                        .field = field, .path = path,
+                        .field = field,
+                        .path = path,
                         .expected = try enumLabel(a, enum_vals),
-                        .received_type = "string", .received_value = from,
-                        .coercible = true, .coerced_to = matched,
-                        .message = try std.fmt.allocPrint(a,
-                            "field '{s}' received '{s}', case-folded to '{s}'",
-                            .{ field, value.string, matched }),
+                        .received_type = "string",
+                        .received_value = from,
+                        .coercible = true,
+                        .coerced_to = matched,
+                        .message = try std.fmt.allocPrint(a, "field '{s}' received '{s}', case-folded to '{s}'", .{ field, value.string, matched }),
                     });
                     return .{ .string = matched };
                 }
@@ -330,14 +349,14 @@ pub const Engine = struct {
 
         result.valid = false;
         try result.errors.append(a, .{
-            .field = field, .path = path,
+            .field = field,
+            .path = path,
             .expected = try enumLabel(a, enum_vals),
             .received_type = jsonTypeLabel(value),
             .received_value = try jsonValueRepr(a, value),
-            .coercible = false, .coerced_to = null,
-            .message = try std.fmt.allocPrint(a,
-                "field '{s}' value {s} not in {s}",
-                .{ field, try jsonValueRepr(a, value), try enumLabel(a, enum_vals) }),
+            .coercible = false,
+            .coerced_to = null,
+            .message = try std.fmt.allocPrint(a, "field '{s}' value {s} not in {s}", .{ field, try jsonValueRepr(a, value), try enumLabel(a, enum_vals) }),
         });
         return value;
     }
@@ -359,14 +378,14 @@ pub const Engine = struct {
             if (prop_count < min) {
                 result.valid = false;
                 try result.errors.append(a, .{
-                    .field = field, .path = path,
+                    .field = field,
+                    .path = path,
                     .expected = try std.fmt.allocPrint(a, ">= {d} properties", .{min}),
                     .received_type = "object",
                     .received_value = try std.fmt.allocPrint(a, "({d} properties)", .{prop_count}),
-                    .coercible = false, .coerced_to = null,
-                    .message = try std.fmt.allocPrint(a,
-                        "object '{s}' has {d} properties, expected at least {d} (minProperties)",
-                        .{ field, prop_count, min }),
+                    .coercible = false,
+                    .coerced_to = null,
+                    .message = try std.fmt.allocPrint(a, "object '{s}' has {d} properties, expected at least {d} (minProperties)", .{ field, prop_count, min }),
                 });
             }
         }
@@ -374,14 +393,14 @@ pub const Engine = struct {
             if (prop_count > max) {
                 result.valid = false;
                 try result.errors.append(a, .{
-                    .field = field, .path = path,
+                    .field = field,
+                    .path = path,
                     .expected = try std.fmt.allocPrint(a, "<= {d} properties", .{max}),
                     .received_type = "object",
                     .received_value = try std.fmt.allocPrint(a, "({d} properties)", .{prop_count}),
-                    .coercible = false, .coerced_to = null,
-                    .message = try std.fmt.allocPrint(a,
-                        "object '{s}' has {d} properties, expected at most {d} (maxProperties)",
-                        .{ field, prop_count, max }),
+                    .coercible = false,
+                    .coerced_to = null,
+                    .message = try std.fmt.allocPrint(a, "object '{s}' has {d} properties, expected at most {d} (maxProperties)", .{ field, prop_count, max }),
                 });
             }
         }
@@ -393,12 +412,14 @@ pub const Engine = struct {
                 result.valid = false;
                 const cp = try std.fmt.allocPrint(a, "{s}.{s}", .{ path, req });
                 try result.errors.append(a, .{
-                    .field = req, .path = cp,
-                    .expected = "present", .received_type = "missing",
+                    .field = req,
+                    .path = cp,
+                    .expected = "present",
+                    .received_type = "missing",
                     .received_value = "undefined",
-                    .coercible = false, .coerced_to = null,
-                    .message = try std.fmt.allocPrint(a,
-                        "required field '{s}' is missing", .{req}),
+                    .coercible = false,
+                    .coerced_to = null,
+                    .message = try std.fmt.allocPrint(a, "required field '{s}' is missing", .{req}),
                 });
             }
         }
@@ -418,19 +439,18 @@ pub const Engine = struct {
             } else if (schema.additional_properties_forbidden) {
                 result.valid = false;
                 try result.errors.append(a, .{
-                    .field = key, .path = cp,
+                    .field = key,
+                    .path = cp,
                     .expected = "not present",
                     .received_type = jsonTypeLabel(child_val),
                     .received_value = try jsonValueRepr(a, child_val),
                     .coercible = coerce,
                     .coerced_to = if (coerce) "(removed)" else null,
-                    .message = try std.fmt.allocPrint(a,
-                        "field '{s}' is not allowed (additionalProperties: false)", .{key}),
+                    .message = try std.fmt.allocPrint(a, "field '{s}' is not allowed (additionalProperties: false)", .{key}),
                 });
                 if (!coerce) try out_obj.put(a, key, child_val);
             } else if (coerce) {
-                try result.warnings.append(a, try std.fmt.allocPrint(a,
-                    "field '{s}' (path: {s}) not in schema, stripped", .{ key, cp }));
+                try result.warnings.append(a, try std.fmt.allocPrint(a, "field '{s}' (path: {s}) not in schema, stripped", .{ key, cp }));
             } else {
                 try out_obj.put(a, key, child_val);
             }
@@ -456,14 +476,14 @@ pub const Engine = struct {
             if (len < min) {
                 result.valid = false;
                 try result.errors.append(a, .{
-                    .field = field, .path = path,
+                    .field = field,
+                    .path = path,
                     .expected = try std.fmt.allocPrint(a, "length >= {d}", .{min}),
                     .received_type = "array",
                     .received_value = try std.fmt.allocPrint(a, "(length {d})", .{len}),
-                    .coercible = false, .coerced_to = null,
-                    .message = try std.fmt.allocPrint(a,
-                        "array '{s}' has {d} item(s), expected at least {d} (minItems)",
-                        .{ field, len, min }),
+                    .coercible = false,
+                    .coerced_to = null,
+                    .message = try std.fmt.allocPrint(a, "array '{s}' has {d} item(s), expected at least {d} (minItems)", .{ field, len, min }),
                 });
             }
         }
@@ -471,14 +491,14 @@ pub const Engine = struct {
             if (len > max) {
                 result.valid = false;
                 try result.errors.append(a, .{
-                    .field = field, .path = path,
+                    .field = field,
+                    .path = path,
                     .expected = try std.fmt.allocPrint(a, "length <= {d}", .{max}),
                     .received_type = "array",
                     .received_value = try std.fmt.allocPrint(a, "(length {d})", .{len}),
-                    .coercible = false, .coerced_to = null,
-                    .message = try std.fmt.allocPrint(a,
-                        "array '{s}' has {d} item(s), expected at most {d} (maxItems)",
-                        .{ field, len, max }),
+                    .coercible = false,
+                    .coerced_to = null,
+                    .message = try std.fmt.allocPrint(a, "array '{s}' has {d} item(s), expected at most {d} (maxItems)", .{ field, len, max }),
                 });
             }
         }
@@ -504,25 +524,25 @@ pub const Engine = struct {
         const a = self.arena;
         const valid = switch (fmt) {
             .email => isValidEmail(s),
-            .uuid  => isValidUuid(s),
-            .date  => isValidDate(s),
+            .uuid => isValidUuid(s),
+            .date => isValidDate(s),
             .date_time => isValidDateTime(s),
-            .uri   => s.len > 0 and std.mem.indexOf(u8, s, "://") != null,
-            .ipv4  => isValidIpv4(s),
-            else   => true,
+            .uri => s.len > 0 and std.mem.indexOf(u8, s, "://") != null,
+            .ipv4 => isValidIpv4(s),
+            else => true,
         };
         if (!valid) {
             result.valid = false;
             const field = fieldFromPath(path);
             try result.errors.append(a, .{
-                .field = field, .path = path,
+                .field = field,
+                .path = path,
                 .expected = fmt.label(),
                 .received_type = "string",
                 .received_value = try std.fmt.allocPrint(a, "\"{s}\"", .{s}),
-                .coercible = false, .coerced_to = null,
-                .message = try std.fmt.allocPrint(a,
-                    "field '{s}' value \"{s}\" does not match format '{s}'",
-                    .{ field, s, fmt.label() }),
+                .coercible = false,
+                .coerced_to = null,
+                .message = try std.fmt.allocPrint(a, "field '{s}' value \"{s}\" does not match format '{s}'", .{ field, s, fmt.label() }),
             });
         }
     }
@@ -540,14 +560,14 @@ pub const Engine = struct {
             if (s.len < min) {
                 result.valid = false;
                 try result.errors.append(a, .{
-                    .field = field, .path = path,
+                    .field = field,
+                    .path = path,
                     .expected = try std.fmt.allocPrint(a, "length >= {d}", .{min}),
                     .received_type = "string",
                     .received_value = try std.fmt.allocPrint(a, "\"{s}\"", .{s}),
-                    .coercible = false, .coerced_to = null,
-                    .message = try std.fmt.allocPrint(a,
-                        "field '{s}' length {d} is less than minLength {d}",
-                        .{ field, s.len, min }),
+                    .coercible = false,
+                    .coerced_to = null,
+                    .message = try std.fmt.allocPrint(a, "field '{s}' length {d} is less than minLength {d}", .{ field, s.len, min }),
                 });
             }
         }
@@ -555,14 +575,14 @@ pub const Engine = struct {
             if (s.len > max) {
                 result.valid = false;
                 try result.errors.append(a, .{
-                    .field = field, .path = path,
+                    .field = field,
+                    .path = path,
                     .expected = try std.fmt.allocPrint(a, "length <= {d}", .{max}),
                     .received_type = "string",
                     .received_value = try std.fmt.allocPrint(a, "\"{s}\"", .{s}),
-                    .coercible = false, .coerced_to = null,
-                    .message = try std.fmt.allocPrint(a,
-                        "field '{s}' length {d} exceeds maxLength {d}",
-                        .{ field, s.len, max }),
+                    .coercible = false,
+                    .coerced_to = null,
+                    .message = try std.fmt.allocPrint(a, "field '{s}' length {d} exceeds maxLength {d}", .{ field, s.len, max }),
                 });
             }
         }
@@ -572,20 +592,18 @@ pub const Engine = struct {
                 .no_match => {
                     result.valid = false;
                     try result.errors.append(a, .{
-                        .field = field, .path = path,
+                        .field = field,
+                        .path = path,
                         .expected = try std.fmt.allocPrint(a, "matches pattern '{s}'", .{pattern}),
                         .received_type = "string",
                         .received_value = try std.fmt.allocPrint(a, "\"{s}\"", .{s}),
-                        .coercible = false, .coerced_to = null,
-                        .message = try std.fmt.allocPrint(a,
-                            "field '{s}' value \"{s}\" does not match pattern '{s}'",
-                            .{ field, s, pattern }),
+                        .coercible = false,
+                        .coerced_to = null,
+                        .message = try std.fmt.allocPrint(a, "field '{s}' value \"{s}\" does not match pattern '{s}'", .{ field, s, pattern }),
                     });
                 },
                 .invalid_pattern => {
-                    try result.warnings.append(a, try std.fmt.allocPrint(a,
-                        "field '{s}': pattern '{s}' is not valid POSIX ERE (skipped)",
-                        .{ field, pattern }));
+                    try result.warnings.append(a, try std.fmt.allocPrint(a, "field '{s}': pattern '{s}' is not valid POSIX ERE (skipped)", .{ field, pattern }));
                 },
             }
         }
@@ -608,13 +626,14 @@ pub const Engine = struct {
         result.valid = false;
         const field = fieldFromPath(path);
         try result.errors.append(self.arena, .{
-            .field = field, .path = path,
+            .field = field,
+            .path = path,
             .expected = "match at least one subschema (anyOf)",
             .received_type = jsonTypeLabel(value),
             .received_value = try jsonValueRepr(self.arena, value),
-            .coercible = false, .coerced_to = null,
-            .message = try std.fmt.allocPrint(self.arena,
-                "field '{s}' does not match any subschema (anyOf)", .{field}),
+            .coercible = false,
+            .coerced_to = null,
+            .message = try std.fmt.allocPrint(self.arena, "field '{s}' does not match any subschema (anyOf)", .{field}),
         });
         return value;
     }
@@ -642,14 +661,14 @@ pub const Engine = struct {
         result.valid = false;
         const field = fieldFromPath(path);
         try result.errors.append(self.arena, .{
-            .field = field, .path = path,
+            .field = field,
+            .path = path,
             .expected = "match exactly one subschema (oneOf)",
             .received_type = jsonTypeLabel(value),
             .received_value = try jsonValueRepr(self.arena, value),
-            .coercible = false, .coerced_to = null,
-            .message = try std.fmt.allocPrint(self.arena,
-                "field '{s}' matches {d} subschemas, expected exactly 1 (oneOf)",
-                .{ field, match_count }),
+            .coercible = false,
+            .coerced_to = null,
+            .message = try std.fmt.allocPrint(self.arena, "field '{s}' matches {d} subschemas, expected exactly 1 (oneOf)", .{ field, match_count }),
         });
         return value;
     }
@@ -668,13 +687,14 @@ pub const Engine = struct {
             result.valid = false;
             const field = fieldFromPath(path);
             try result.errors.append(self.arena, .{
-                .field = field, .path = path,
+                .field = field,
+                .path = path,
                 .expected = "not match subschema (not)",
                 .received_type = jsonTypeLabel(value),
                 .received_value = try jsonValueRepr(self.arena, value),
-                .coercible = false, .coerced_to = null,
-                .message = try std.fmt.allocPrint(self.arena,
-                    "field '{s}' must not match the 'not' subschema", .{field}),
+                .coercible = false,
+                .coerced_to = null,
+                .message = try std.fmt.allocPrint(self.arena, "field '{s}' must not match the 'not' subschema", .{field}),
             });
         }
     }
@@ -689,21 +709,22 @@ pub const Engine = struct {
         const a = self.arena;
         const n: f64 = switch (value) {
             .integer => |i| @floatFromInt(i),
-            .float   => |f| f,
-            else     => return,
+            .float => |f| f,
+            else => return,
         };
         const field = fieldFromPath(path);
         if (schema.minimum) |min| {
             if (n < min) {
                 result.valid = false;
                 try result.errors.append(a, .{
-                    .field = field, .path = path,
+                    .field = field,
+                    .path = path,
                     .expected = try std.fmt.allocPrint(a, ">= {d}", .{min}),
                     .received_type = "number",
                     .received_value = try std.fmt.allocPrint(a, "{d}", .{n}),
-                    .coercible = false, .coerced_to = null,
-                    .message = try std.fmt.allocPrint(a,
-                        "field '{s}' value {d} is less than minimum {d}", .{ field, n, min }),
+                    .coercible = false,
+                    .coerced_to = null,
+                    .message = try std.fmt.allocPrint(a, "field '{s}' value {d} is less than minimum {d}", .{ field, n, min }),
                 });
             }
         }
@@ -711,13 +732,14 @@ pub const Engine = struct {
             if (n > max) {
                 result.valid = false;
                 try result.errors.append(a, .{
-                    .field = field, .path = path,
+                    .field = field,
+                    .path = path,
                     .expected = try std.fmt.allocPrint(a, "<= {d}", .{max}),
                     .received_type = "number",
                     .received_value = try std.fmt.allocPrint(a, "{d}", .{n}),
-                    .coercible = false, .coerced_to = null,
-                    .message = try std.fmt.allocPrint(a,
-                        "field '{s}' value {d} is greater than maximum {d}", .{ field, n, max }),
+                    .coercible = false,
+                    .coerced_to = null,
+                    .message = try std.fmt.allocPrint(a, "field '{s}' value {d} is greater than maximum {d}", .{ field, n, max }),
                 });
             }
         }
@@ -725,13 +747,14 @@ pub const Engine = struct {
             if (n <= emin) {
                 result.valid = false;
                 try result.errors.append(a, .{
-                    .field = field, .path = path,
+                    .field = field,
+                    .path = path,
                     .expected = try std.fmt.allocPrint(a, "> {d}", .{emin}),
                     .received_type = "number",
                     .received_value = try std.fmt.allocPrint(a, "{d}", .{n}),
-                    .coercible = false, .coerced_to = null,
-                    .message = try std.fmt.allocPrint(a,
-                        "field '{s}' value {d} must be > {d} (exclusiveMinimum)", .{ field, n, emin }),
+                    .coercible = false,
+                    .coerced_to = null,
+                    .message = try std.fmt.allocPrint(a, "field '{s}' value {d} must be > {d} (exclusiveMinimum)", .{ field, n, emin }),
                 });
             }
         }
@@ -739,13 +762,14 @@ pub const Engine = struct {
             if (n >= emax) {
                 result.valid = false;
                 try result.errors.append(a, .{
-                    .field = field, .path = path,
+                    .field = field,
+                    .path = path,
                     .expected = try std.fmt.allocPrint(a, "< {d}", .{emax}),
                     .received_type = "number",
                     .received_value = try std.fmt.allocPrint(a, "{d}", .{n}),
-                    .coercible = false, .coerced_to = null,
-                    .message = try std.fmt.allocPrint(a,
-                        "field '{s}' value {d} must be < {d} (exclusiveMaximum)", .{ field, n, emax }),
+                    .coercible = false,
+                    .coerced_to = null,
+                    .message = try std.fmt.allocPrint(a, "field '{s}' value {d} must be < {d} (exclusiveMaximum)", .{ field, n, emax }),
                 });
             }
         }
@@ -762,14 +786,14 @@ fn fieldFromPath(path: []const u8) []const u8 {
 
 fn jsonTypeLabel(v: std.json.Value) []const u8 {
     return switch (v) {
-        .null         => "null",
-        .bool         => "boolean",
-        .integer      => "integer",
-        .float        => "number",
+        .null => "null",
+        .bool => "boolean",
+        .integer => "integer",
+        .float => "number",
         .number_string => "number",
-        .string       => "string",
-        .array        => "array",
-        .object       => "object",
+        .string => "string",
+        .array => "array",
+        .object => "object",
     };
 }
 
@@ -779,11 +803,11 @@ fn jsonValueRepr(arena: std.mem.Allocator, v: std.json.Value) ![]const u8 {
 
 fn jsonToEnumValue(v: std.json.Value) ir.EnumValue {
     return switch (v) {
-        .string  => |s| .{ .string = s },
+        .string => |s| .{ .string = s },
         .integer => |i| .{ .integer = i },
-        .float   => |f| .{ .float = f },
-        .bool    => |b| .{ .boolean = b },
-        else     => .{ .null = {} },
+        .float => |f| .{ .float = f },
+        .bool => |b| .{ .boolean = b },
+        else => .{ .null = {} },
     };
 }
 
@@ -848,4 +872,3 @@ fn isValidIpv4(s: []const u8) bool {
     }
     return count == 4;
 }
-
